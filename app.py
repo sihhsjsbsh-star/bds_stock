@@ -10,7 +10,6 @@ DIRECCION_LOCAL = "Avenida 1ro. de Mayo &, Carlos Antonio López, Capiatá"
 # =============================================
 
 # ========== CONFIGURACIÓN DE USUARIOS ==========
-# 👇 CAMBIA AQUÍ LOS USUARIOS Y CONTRASEÑAS
 USUARIOS = {
     "Rosana": {
         "password": "bdse1975",
@@ -22,17 +21,6 @@ USUARIOS = {
         "rol": "vendedor",
         "nombre_completo": "vendedor"
     }
-    # Puedes agregar más vendedores así:
-    # "juan": {
-    #     "password": "juan123",
-    #     "rol": "vendedor",
-    #     "nombre_completo": "Juan Pérez"
-    # },
-    # "maria": {
-    #     "password": "maria456",
-    #     "rol": "vendedor",
-    #     "nombre_completo": "María González"
-    # }
 }
 # ================================================
 
@@ -44,49 +32,79 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados
+# Estilos CSS personalizados - MOBILE FIRST
 st.markdown("""
 <style>
-    /* Botones más grandes para móvil */
-    .stButton>button {
-        width: 100%;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 16px;
+    /* Contenedor principal */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        max-width: 100%;
     }
     
-    /* Tarjetas de productos */
+    /* Tarjeta de producto - DISEÑO VERTICAL PARA MÓVIL */
     .producto-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 20px;
-        border-radius: 10px;
-        background-color: #f0f2f6;
-        margin: 10px 0;
-        border-left: 4px solid #1f77b4;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    /* Etiquetas de precio */
-    .precio-tag {
-        font-size: 24px;
-        font-weight: bold;
-        color: #1f77b4;
-    }
-    
-    /* Badges de stock */
-    .stock-badge {
-        display: inline-block;
-        padding: 8px 12px;
-        border-radius: 8px;
-        background-color: #4caf50;
+        border-radius: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         color: white;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .producto-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    .producto-nombre {
+        font-size: 18px;
         font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        margin-bottom: 8px;
+        line-height: 1.3;
+    }
+    
+    .producto-marca {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 4px;
+    }
+    
+    .producto-categoria {
+        font-size: 12px;
+        opacity: 0.8;
+        background: rgba(255,255,255,0.2);
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+    }
+    
+    .precio-grande {
+        font-size: 28px;
+        font-weight: bold;
+        margin: 10px 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .stock-info {
+        display: inline-block;
+        background: rgba(255,255,255,0.25);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 8px;
     }
     
     .stock-bajo {
-        background-color: #f44336;
+        background: #ff6b6b;
         animation: pulse 2s infinite;
+    }
+    
+    .stock-ok {
+        background: rgba(76, 175, 80, 0.8);
     }
     
     @keyframes pulse {
@@ -94,63 +112,90 @@ st.markdown("""
         50% { opacity: 0.7; }
     }
     
-    /* Optimizaciones para móvil */
+    /* Botones más grandes y táctiles */
+    .stButton>button {
+        width: 100%;
+        padding: 14px 24px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 16px;
+        border: none;
+        transition: all 0.2s;
+    }
+    
+    .stButton>button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    /* Inputs optimizados para móvil */
+    .stTextInput input, .stNumberInput input, .stSelectbox select {
+        font-size: 16px !important;
+        padding: 12px !important;
+        border-radius: 10px !important;
+    }
+    
+    /* Expander más visible */
+    .streamlit-expanderHeader {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        background-color: #f0f2f6;
+        border-radius: 10px;
+        padding: 12px !important;
+    }
+    
+    /* Mensaje de búsqueda vacía */
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #666;
+    }
+    
+    .empty-state-icon {
+        font-size: 64px;
+        margin-bottom: 20px;
+    }
+    
+    /* Optimizaciones para pantallas pequeñas */
     @media (max-width: 768px) {
-        /* Tabla más legible */
-        .stDataFrame {
-            font-size: 12px;
+        .producto-card {
+            padding: 16px;
         }
         
-        /* Métricas más grandes */
-        [data-testid="stMetricValue"] {
-            font-size: 20px !important;
+        .producto-nombre {
+            font-size: 16px;
         }
         
-        [data-testid="stMetricLabel"] {
-            font-size: 13px !important;
+        .precio-grande {
+            font-size: 24px;
         }
         
-        /* Títulos ajustados */
         h1 {
-            font-size: 26px !important;
-            margin-bottom: 10px !important;
+            font-size: 24px !important;
         }
         
         h2 {
-            font-size: 22px !important;
-            margin-bottom: 8px !important;
+            font-size: 20px !important;
         }
         
         h3 {
             font-size: 18px !important;
-            margin-bottom: 8px !important;
         }
         
-        /* Inputs más grandes para móvil */
-        .stTextInput input, .stNumberInput input, .stSelectbox select {
-            font-size: 16px !important;
-            padding: 12px !important;
-        }
-        
-        /* Sidebar más estrecho */
         [data-testid="stSidebar"] {
-            width: 250px !important;
-        }
-        
-        /* Espaciado optimizado */
-        .element-container {
-            margin-bottom: 8px !important;
+            width: 280px !important;
         }
     }
     
-    /* Mejoras visuales generales */
-    .stSelectbox, .stTextInput, .stNumberInput {
-        border-radius: 8px;
-    }
-    
-    /* Sidebar más bonito */
-    [data-testid="stSidebar"] {
-        background-color: rgba(240, 242, 246, 0.5);
+    /* Badge de resultados */
+    .resultados-badge {
+        background: #1f77b4;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        display: inline-block;
+        font-weight: 600;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -165,7 +210,6 @@ def get_connection():
 def leer_productos():
     conn = get_connection()
     df = conn.read(worksheet="PRODUCTOS")
-    # Limpiar filas vacías
     df = df.dropna(how='all')
     return df
 
@@ -178,7 +222,6 @@ def leer_ventas():
         df = df.dropna(how='all')
         return df
     except:
-        # Si la hoja VENTAS no existe o está vacía, crear DataFrame vacío
         return pd.DataFrame(columns=['FECHA', 'VENDEDOR', 'PRODUCTO', 'CANTIDAD', 'TIPO_PAGO', 'MONTO_TOTAL'])
 
 # Función para guardar productos
@@ -190,11 +233,8 @@ def guardar_productos(df):
 # Función para registrar venta
 def registrar_venta(vendedor, producto, cantidad, tipo_pago, monto_total):
     conn = get_connection()
-    
-    # Leer ventas actuales
     df_ventas = leer_ventas()
     
-    # Crear nueva fila
     nueva_venta = pd.DataFrame([{
         'FECHA': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'VENDEDOR': vendedor,
@@ -204,22 +244,117 @@ def registrar_venta(vendedor, producto, cantidad, tipo_pago, monto_total):
         'MONTO_TOTAL': monto_total
     }])
     
-    # Agregar nueva venta
     df_ventas = pd.concat([df_ventas, nueva_venta], ignore_index=True)
-    
-    # Guardar en Google Sheets
     conn.update(worksheet="VENTAS", data=df_ventas)
-    
     st.cache_data.clear()
 
 # Función para actualizar stock
 def actualizar_stock(df_productos, producto_nombre, cantidad_vendida):
-    # Buscar el producto y reducir stock
     mask = df_productos['PRODUCTO'] == producto_nombre
     df_productos.loc[mask, 'STOCK'] = df_productos.loc[mask, 'STOCK'] - cantidad_vendida
-    
-    # Guardar cambios
     guardar_productos(df_productos)
+
+# FUNCIÓN PARA RENDERIZAR TARJETA DE PRODUCTO - MOBILE FIRST
+def renderizar_tarjeta_producto(producto, index):
+    """Renderiza una tarjeta de producto optimizada para móvil"""
+    
+    nombre = producto['PRODUCTO']
+    marca = producto['MARCA']
+    categoria = producto['CATEGORIA']
+    precio_contado = float(producto['CONTADO'])
+    precio_6_cuotas = float(producto['6 CUOTAS'])
+    precio_12_cuotas = float(producto['12 CUOTAS'])
+    stock = int(producto['STOCK'])
+    
+    # Determinar clase de stock
+    stock_class = "stock-ok" if stock >= 5 else "stock-bajo"
+    stock_emoji = "✅" if stock >= 5 else "⚠️"
+    
+    # HTML de la tarjeta
+    st.markdown(f"""
+    <div class="producto-card">
+        <div class="producto-categoria">📂 {categoria}</div>
+        <div class="producto-nombre">{nombre}</div>
+        <div class="producto-marca">🏷️ {marca}</div>
+        <div class="precio-grande">₲ {precio_contado:,.0f}</div>
+        <div style="font-size: 12px; opacity: 0.9;">💳 Contado</div>
+        <div class="stock-info {stock_class}">{stock_emoji} Stock: {stock}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Botón de vender
+    if stock > 0:
+        if st.button(f"🛒 Vender", key=f"vender_{index}", use_container_width=True, type="primary"):
+            st.session_state[f'venta_activa_{index}'] = True
+            st.rerun()
+        
+        # Formulario de venta dentro de expander
+        if st.session_state.get(f'venta_activa_{index}', False):
+            with st.expander("📝 Completar Venta", expanded=True):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    cantidad = st.number_input(
+                        "Cantidad",
+                        min_value=1,
+                        max_value=stock,
+                        value=1,
+                        key=f"cant_{index}"
+                    )
+                
+                with col2:
+                    tipo_pago = st.selectbox(
+                        "Tipo de Pago",
+                        ["Contado", "6 CUOTAS", "12 CUOTAS"],
+                        key=f"pago_{index}"
+                    )
+                
+                # Calcular precio según tipo de pago
+                if tipo_pago == "Contado":
+                    precio_unitario = precio_contado
+                elif tipo_pago == "6 CUOTAS":
+                    precio_unitario = precio_6_cuotas
+                else:
+                    precio_unitario = precio_12_cuotas
+                
+                monto_total = precio_unitario * cantidad
+                
+                # Resumen
+                st.markdown("---")
+                st.markdown(f"**Precio Unit.:** ₲ {precio_unitario:,.0f}")
+                st.markdown(f"**Cantidad:** {cantidad}")
+                st.markdown(f"### 💰 Total: ₲ {monto_total:,.0f}")
+                
+                col_a, col_b = st.columns(2)
+                
+                with col_a:
+                    if st.button("✅ Confirmar", key=f"conf_{index}", use_container_width=True):
+                        try:
+                            df_productos = leer_productos()
+                            actualizar_stock(df_productos, nombre, cantidad)
+                            registrar_venta(
+                                st.session_state.username,
+                                nombre,
+                                cantidad,
+                                tipo_pago,
+                                monto_total
+                            )
+                            st.success("🎉 ¡Venta exitosa!")
+                            st.session_state[f'venta_activa_{index}'] = False
+                            import time
+                            time.sleep(1.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                
+                with col_b:
+                    if st.button("❌ Cancelar", key=f"canc_{index}", use_container_width=True):
+                        st.session_state[f'venta_activa_{index}'] = False
+                        st.rerun()
+    else:
+        st.error("⛔ Sin stock")
+    
+    st.markdown("---")
 
 # Sistema de autenticación
 def login_page():
@@ -248,15 +383,15 @@ def login_page():
         **Credenciales de prueba:**
         
         👤 **Administrador:**
-        - Usuario: `admin`
-        - Contraseña: `admin123`
+        - Usuario: `Rosana`
+        - Contraseña: `bdse1975`
         
         👤 **Vendedor:**
         - Usuario: `vendedor`
         - Contraseña: `ventas123`
         """)
 
-# Panel del vendedor
+# Panel del vendedor - REDISEÑADO MOBILE FIRST
 def panel_vendedor():
     st.title("🛒 Registro de Ventas")
     st.markdown(f"Bienvenido, **{st.session_state.username}**")
@@ -270,162 +405,81 @@ def panel_vendedor():
         st.info("Verifica que tu Google Sheet tenga una hoja llamada 'PRODUCTOS' con las columnas correctas.")
         return
     
-    # Buscador de productos con autocompletado
-    st.markdown("### 🔍 Buscar Producto")
-    busqueda = st.text_input(
-        "Buscar por nombre, marca o categoría",
-        placeholder="Ej: heladera, samsung, refrigeración...",
-        key="search_vendedor"
-    )
+    # FILTROS EN DOS COLUMNAS
+    col1, col2 = st.columns(2)
     
-    # Filtrar productos en tiempo real
-    if busqueda:
-        mascara = (
-            df_productos['PRODUCTO'].str.contains(busqueda, case=False, na=False) |
-            df_productos['MARCA'].str.contains(busqueda, case=False, na=False) |
-            df_productos['CATEGORIA'].str.contains(busqueda, case=False, na=False)
+    with col1:
+        # Selector de categoría
+        categorias = ['Todas'] + sorted(df_productos['CATEGORIA'].unique().tolist())
+        categoria_seleccionada = st.selectbox(
+            "📂 Categoría",
+            categorias,
+            key="filtro_categoria"
         )
-        df_filtrado = df_productos[mascara]
-        
-        # Mostrar sugerencias en tiempo real
-        if len(df_filtrado) > 0:
-            st.info(f"💡 {len(df_filtrado)} productos encontrados")
-    else:
-        df_filtrado = df_productos
+    
+    with col2:
+        # Buscador de texto
+        busqueda = st.text_input(
+            "🔍 Buscar",
+            placeholder="Nombre o marca...",
+            key="search_vendedor"
+        )
     
     st.markdown("---")
     
-    if df_filtrado.empty:
-        st.warning("⚠️ No se encontraron productos con ese criterio de búsqueda.")
-        st.info("💡 Intenta con otro término: nombre del producto, marca o categoría")
-    else:
-        # Mostrar cantidad de resultados solo si hay búsqueda activa
-        if busqueda:
-            st.success(f"✅ **{len(df_filtrado)} productos encontrados**")
-        
-        # Selector de producto con productos filtrados
-        productos_lista = df_filtrado['PRODUCTO'].tolist()
-        producto_seleccionado = st.selectbox(
-            "Selecciona el producto a vender",
-            productos_lista,
-            key="producto_select"
+    # APLICAR FILTROS
+    df_filtrado = df_productos.copy()
+    
+    # Filtrar por categoría
+    if categoria_seleccionada != 'Todas':
+        df_filtrado = df_filtrado[df_filtrado['CATEGORIA'] == categoria_seleccionada]
+    
+    # Filtrar por búsqueda
+    if busqueda:
+        mascara = (
+            df_filtrado['PRODUCTO'].str.contains(busqueda, case=False, na=False) |
+            df_filtrado['MARCA'].str.contains(busqueda, case=False, na=False)
         )
+        df_filtrado = df_filtrado[mascara]
+    
+    # MOSTRAR RESULTADOS
+    if busqueda or categoria_seleccionada != 'Todas':
+        # Hay filtros aplicados
+        if len(df_filtrado) > 0:
+            st.markdown(f'<div class="resultados-badge">📦 {len(df_filtrado)} productos encontrados</div>', unsafe_allow_html=True)
+            st.markdown("")
+            
+            # Renderizar tarjetas de productos
+            for index, row in df_filtrado.iterrows():
+                renderizar_tarjeta_producto(row, index)
+        else:
+            # No hay resultados
+            st.markdown("""
+            <div class="empty-state">
+                <div class="empty-state-icon">🔍</div>
+                <h3>No se encontraron productos</h3>
+                <p>Intenta con otro término de búsqueda o categoría diferente</p>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        # No hay filtros - mostrar mensaje inicial
+        st.markdown("""
+        <div class="empty-state">
+            <div class="empty-state-icon">👆</div>
+            <h3>Usa el buscador o selecciona una categoría para empezar</h3>
+            <p>Evitamos mostrar todos los productos para una mejor experiencia en móvil</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if producto_seleccionado:
-            # Obtener información del producto
-            producto_info = df_filtrado[df_filtrado['PRODUCTO'] == producto_seleccionado].iloc[0]
-            
-            # Mostrar información del producto en formato amigable para móvil
-            st.markdown("---")
-            st.markdown("### 📦 Información del Producto")
-            
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                st.markdown(f"**{producto_info['PRODUCTO']}**")
-                st.caption(f"🏷️ {producto_info['MARCA']} | 📂 {producto_info['CATEGORIA']}")
-                
-                # Precios en formato compacto
-                st.markdown("**💰 Precios:**")
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.metric("Contado", f"₲ {int(producto_info['CONTADO']):,}")
-                with col_b:
-                    st.metric("6 Cuotas", f"₲ {int(producto_info['6 CUOTAS']):,}")
-                with col_c:
-                    st.metric("12 Cuotas", f"₲ {int(producto_info['12 CUOTAS']):,}")
-            
-            with col2:
-                stock_actual = int(producto_info['STOCK'])
-                stock_class = "stock-badge" if stock_actual >= 5 else "stock-badge stock-bajo"
-                st.markdown(f"""
-                <div style="text-align: center; padding: 10px;">
-                    <p style="margin: 0; font-size: 12px;">Stock</p>
-                    <div class="{stock_class}" style="font-size: 28px; margin-top: 5px;">
-                        {stock_actual}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("---")
-            
-            # Formulario de venta
-            if stock_actual > 0:
-                col_a, col_b = st.columns(2)
-                
-                with col_a:
-                    cantidad = st.number_input(
-                        "Cantidad a vender",
-                        min_value=1,
-                        max_value=stock_actual,
-                        value=1,
-                        step=1,
-                        key="cantidad_venta"
-                    )
-                
-                with col_b:
-                    tipo_pago = st.selectbox(
-                        "Tipo de Pago",
-                        ["Contado", "6 CUOTAS", "12 CUOTAS"],
-                        key="tipo_pago_select"
-                    )
-                
-                # Calcular precio según tipo de pago
-                if tipo_pago == "Contado":
-                    precio_unitario = float(producto_info['CONTADO'])
-                elif tipo_pago == "6 CUOTAS":
-                    precio_unitario = float(producto_info['6 CUOTAS'])
-                else:  # 12 CUOTAS
-                    precio_unitario = float(producto_info['12 CUOTAS'])
-                
-                monto_total = precio_unitario * cantidad
-                
-                # Mostrar resumen
-                st.markdown("---")
-                st.markdown("### 💰 Resumen de la Venta")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Precio Unit.", f"₲ {precio_unitario:,.0f}")
-                    st.metric("Cantidad", cantidad)
-                with col2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.markdown(f"""
-                    <div style="background-color: #1f77b4; color: white; padding: 15px; border-radius: 10px; text-align: center;">
-                        <p style="margin: 0; font-size: 14px;">TOTAL A PAGAR</p>
-                        <p style="margin: 0; font-size: 24px; font-weight: bold;">₲ {monto_total:,.0f}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown("---")
-                
-                # Botón confirmar venta
-                if st.button("✅ Confirmar Venta", use_container_width=True, type="primary"):
-                    try:
-                        # Actualizar stock
-                        actualizar_stock(df_productos, producto_seleccionado, cantidad)
-                        
-                        # Registrar venta
-                        registrar_venta(
-                            st.session_state.username,
-                            producto_seleccionado,
-                            cantidad,
-                            tipo_pago,
-                            monto_total
-                        )
-                        
-                        st.success("🎉 ¡Venta registrada exitosamente!")
-                        st.balloons()
-                        
-                        # Esperar un momento y recargar
-                        import time
-                        time.sleep(2)
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"❌ Error al registrar la venta: {str(e)}")
-            else:
-                st.error("⚠️ Este producto no tiene stock disponible.")
+        # Mostrar estadísticas generales
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("📦 Total Productos", len(df_productos))
+        with col2:
+            st.metric("📂 Categorías", len(df_productos['CATEGORIA'].unique()))
+        with col3:
+            productos_disponibles = len(df_productos[df_productos['STOCK'] > 0])
+            st.metric("✅ Con Stock", productos_disponibles)
 
 # Panel del administrador
 def panel_administrador():
@@ -443,7 +497,7 @@ def panel_administrador():
             
             st.info("💡 Puedes editar, agregar o eliminar productos directamente en la tabla. Presiona 'Guardar Cambios' cuando termines.")
             
-            # Reordenar columnas para mejor visualización en móvil
+            # Reordenar columnas para mejor visualización
             columnas_ordenadas = ['PRODUCTO', 'MARCA', 'CATEGORIA', 'CONTADO', '6 CUOTAS', '12 CUOTAS', 'STOCK']
             df_productos = df_productos[columnas_ordenadas]
             
@@ -465,11 +519,11 @@ def panel_administrador():
                 key="editor_productos"
             )
             
-            col1, col2, col3 = st.columns([1, 1, 2])
+            col1, col2 = st.columns([1, 1])
             with col1:
                 if st.button("💾 Guardar Cambios", use_container_width=True, type="primary"):
                     try:
-                        # Reordenar columnas al formato original antes de guardar
+                        # Reordenar al formato original
                         columnas_originales = ['CATEGORIA', 'MARCA', 'PRODUCTO', 'CONTADO', '12 CUOTAS', '6 CUOTAS', 'STOCK']
                         df_editado = df_editado[columnas_originales]
                         guardar_productos(df_editado)
