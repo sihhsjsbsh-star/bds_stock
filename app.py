@@ -276,7 +276,7 @@ def panel_vendedor():
         card_visual(row, idx, es_admin=False)
 
 def panel_admin():
-    st.title("⚙️ Panel de Control")
+    st.title("⚙️ Hola, Rosana")
     if 'mob_q' in st.session_state and st.session_state.mob_q:
         st.info(f"Tienes {len(st.session_state.mob_q)} cambios pendientes de guardar.")
         if st.button("💾 GUARDAR TODO EN BD", type="primary"):
@@ -334,3 +334,4 @@ else:
         panel_admin()
     else:
         panel_vendedor()
+
