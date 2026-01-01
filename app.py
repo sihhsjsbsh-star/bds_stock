@@ -8,10 +8,10 @@ import unicodedata
 
 # ========== CONFIGURACIÓN GLOBAL ==========
 NOMBRE_LOCAL = "BDS Electrodomésticos"
-LOGO_PATH = "bds_image.jpg" # Tu archivo exacto
+LOGO_PATH = "bds_image.jpg"
 # ==========================================
 
-# Configuración de página (Debe ser lo primero)
+# Configuración de página
 st.set_page_config(
     page_title=NOMBRE_LOCAL,
     page_icon="🔴",
@@ -22,132 +22,71 @@ st.set_page_config(
 # ========== ESTILOS CSS "PREMIUM" ==========
 st.markdown("""
 <style>
-    /* Importar fuente moderna */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* COLORES PRINCIPALES */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     :root {
-        --primary: #D32F2F; /* Rojo BDS */
-        --primary-dark: #B71C1C;
-        --bg-gray: #F8F9FA;
-        --card-bg: #FFFFFF;
-        --text-main: #1F2937;
+        --primary: #D32F2F; --primary-dark: #B71C1C;
+        --bg-gray: #F8F9FA; --card-bg: #FFFFFF; --text-main: #1F2937;
     }
-
-    /* FONDO GENERAL */
-    .stApp {
-        background-color: var(--bg-gray);
-    }
-
-    /* TARJETA DE LOGIN */
+    .stApp { background-color: var(--bg-gray); }
     .login-card {
-        background-color: white;
-        padding: 40px;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        text-align: center;
+        background-color: white; padding: 40px; border-radius: 20px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;
         border-top: 5px solid var(--primary);
     }
-
-    /* BOTONES ROJOS */
     .stButton > button {
-        background-color: var(--primary) !important;
-        color: white !important;
-        border: none;
-        border-radius: 10px;
-        height: 50px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        transition: all 0.3s ease;
+        background-color: var(--primary) !important; color: white !important;
+        border: none; border-radius: 10px; height: 50px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;
     }
     .stButton > button:hover {
         background-color: var(--primary-dark) !important;
-        box-shadow: 0 5px 15px rgba(211, 47, 47, 0.4);
-        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(211, 47, 47, 0.4); transform: translateY(-2px);
     }
-
-    /* TARJETAS DE PRODUCTOS (VENDEDOR/MOVIL) */
     .product-card {
-        background: white;
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 20px;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+        border: 1px solid #E5E7EB; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         transition: transform 0.2s;
     }
-    .product-card:hover {
-        border-color: var(--primary);
-        transform: translateY(-3px);
-    }
-    
-    .card-title {
-        font-size: 18px;
-        font-weight: 800;
-        color: var(--text-main);
-        margin-bottom: 4px;
-        line-height: 1.3;
-    }
-    
-    .card-meta {
-        font-size: 12px;
-        color: #6B7280;
-        text-transform: uppercase;
-        font-weight: 600;
-        margin-bottom: 12px;
-    }
-
-    /* PRECIOS */
+    .product-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+    .card-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; line-height: 1.3; }
+    .card-meta { font-size: 12px; color: #6B7280; text-transform: uppercase; font-weight: 600; margin-bottom: 12px; }
     .price-main {
         background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-        color: white;
-        padding: 12px;
-        border-radius: 8px;
-        text-align: center;
-        margin: 10px 0;
+        color: white; padding: 12px; border-radius: 8px; text-align: center; margin: 10px 0;
     }
     .price-main .label { font-size: 10px; opacity: 0.8; text-transform: uppercase; }
     .price-main .value { font-size: 24px; font-weight: 900; }
-
-    .price-sec {
-        background: #F3F4F6;
-        padding: 8px;
-        border-radius: 6px;
-        text-align: center;
-    }
+    .price-sec { background: #F3F4F6; padding: 8px; border-radius: 6px; text-align: center; }
     .price-sec .label { font-size: 9px; color: #666; font-weight: 700; }
     .price-sec .value { font-size: 14px; color: #333; font-weight: 700; }
-
-    /* STOCK BADGES */
-    .badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 800;
-    }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; }
     .badge-ok { background: #DCFCE7; color: #166534; }
     .badge-low { background: #FEE2E2; color: #991B1B; }
-
-    /* SIDEBAR */
-    [data-testid="stSidebar"] {
-        background-color: white;
-        border-right: 1px solid #E5E7EB;
-    }
-    [data-testid="stSidebar"] img {
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
+    [data-testid="stSidebar"] { background-color: white; border-right: 1px solid #E5E7EB; }
+    [data-testid="stSidebar"] img { border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== LÓGICA DE NEGOCIO (SIN CAMBIOS, SOLO ROBUSTEZ) ==========
+# ========== CEREBRO DE BÚSQUEDA (RECUPERADO) ==========
+def normalizar_texto(texto):
+    """Quita tildes, ñ y pone minúsculas (Tokyo = tokyo)"""
+    if not isinstance(texto, str): return str(texto).lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn').lower().strip()
+
+def fuzzy_match(query, text, threshold=0.7):
+    """Búsqueda inteligente: encuentra similitudes aunque haya errores de dedo"""
+    if not query or not text: return False
+    q = normalizar_texto(query)
+    t = normalizar_texto(text)
+    
+    # 1. Coincidencia directa (substring)
+    if q in t: return True
+    
+    # 2. Coincidencia difusa (si falla la directa)
+    return SequenceMatcher(None, q, t).ratio() >= threshold
+
+# ========== LÓGICA DE NEGOCIO ==========
 @st.cache_resource
 def get_connection():
     return st.connection("gsheets", type=GSheetsConnection)
@@ -203,7 +142,6 @@ def actualizar_stock_venta(nombre, cantidad):
 # ========== COMPONENTES VISUALES ==========
 
 def card_visual(row, idx, es_admin=False):
-    # Datos
     nom = row['PRODUCTO']
     marca = row['MARCA']
     cat = row['CATEGORIA']
@@ -270,15 +208,21 @@ def card_visual(row, idx, es_admin=False):
             with st.container(border=True):
                 st.warning("Editar Producto")
                 with st.form(key=f"fe_{idx}"):
-                    # Campos completos para no perder datos
                     nn = st.text_input("Nombre", nom)
+                    nm = st.text_input("Marca", marca)
+                    nc = st.text_input("Categoría", cat)
                     ns = st.number_input("Stock", value=stk)
                     np1 = st.number_input("Contado", value=int(p1))
+                    np6 = st.number_input("6 Cuotas", value=int(p6))
+                    np12 = st.number_input("12 Cuotas", value=int(p12))
+                    
                     if st.form_submit_button("💾 GUARDAR"):
                         if 'mob_q' not in st.session_state: st.session_state.mob_q = {}
-                        # Guardar fila completa actualizada
                         new_row = row.to_dict()
-                        new_row.update({'PRODUCTO':nn, 'STOCK':ns, 'CONTADO':np1})
+                        new_row.update({
+                            'PRODUCTO':nn, 'MARCA':nm, 'CATEGORIA':nc,
+                            'STOCK':ns, 'CONTADO':np1, '6 CUOTAS':np6, '12 CUOTAS':np12
+                        })
                         st.session_state.mob_q[idx] = new_row
                         st.session_state[f'mod_e_{idx}'] = False
                         st.success("Guardado en cola. Dale a 'GUARDAR CAMBIOS' arriba.")
@@ -287,11 +231,9 @@ def card_visual(row, idx, es_admin=False):
 # ========== PÁGINAS ==========
 
 def login_page():
-    # Diseño centrado y elegante
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        # INICIO TARJETA
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
         try: st.image(LOGO_PATH, width=150) 
@@ -310,12 +252,13 @@ def login_page():
             if u in creds and creds[u] == p:
                 st.session_state.logged_in = True
                 st.session_state.user_role = "admin" if u == "Rosana" else "vendedor"
-                st.session_state.username = u
+                # Lógica Walter
+                st.session_state.username = "Walter" if u == "vendedor" else "Rosana Da Silva"
                 st.rerun()
             else:
                 st.error("Credenciales incorrectas")
         
-        st.markdown('</div>', unsafe_allow_html=True) # FIN TARJETA
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def panel_vendedor():
     st.title(f"👋 Hola, {st.session_state.username}")
@@ -323,21 +266,17 @@ def panel_vendedor():
     
     df = leer_productos()
     
-    # Búsqueda simple
+    # BÚSQUEDA INTELIGENTE REACTIVADA
     if q:
-        q = q.lower()
-        # Filtramos por texto
-        df = df[df.apply(lambda r: q in str(r['PRODUCTO']).lower() or q in str(r['MARCA']).lower(), axis=1)]
+        mask = df.apply(lambda r: fuzzy_match(q, str(r['PRODUCTO'])) or fuzzy_match(q, str(r['MARCA'])), axis=1)
+        df = df[mask]
     
     st.write(f"Encontramos {len(df)} productos")
-    
     for idx, row in df.iterrows():
         card_visual(row, idx, es_admin=False)
 
 def panel_admin():
     st.title("⚙️ Panel de Control")
-    
-    # Botonera móvil
     if 'mob_q' in st.session_state and st.session_state.mob_q:
         st.info(f"Tienes {len(st.session_state.mob_q)} cambios pendientes de guardar.")
         if st.button("💾 GUARDAR TODO EN BD", type="primary"):
@@ -350,31 +289,28 @@ def panel_admin():
             st.success("¡Base de datos actualizada!"); time.sleep(1); st.rerun()
 
     tab1, tab2 = st.tabs(["INVENTARIO", "VENTAS"])
-    
     with tab1:
         c1, c2 = st.columns([3,1])
         q = c1.text_input("Buscar en inventario...")
         vista_movil = c2.toggle("Vista Móvil", value=True)
         
         df = leer_productos()
+        
+        # BÚSQUEDA INTELIGENTE REACTIVADA
         if q:
-            q = q.lower()
-            df = df[df.apply(lambda r: q in str(r['PRODUCTO']).lower(), axis=1)]
+            mask = df.apply(lambda r: fuzzy_match(q, str(r['PRODUCTO'])) or fuzzy_match(q, str(r['MARCA'])), axis=1)
+            df = df[mask]
             
         if not vista_movil:
-            # TABLA PC
             edited = st.data_editor(df, num_rows="dynamic", use_container_width=True, height=500)
             if st.button("💾 GUARDAR TABLA"):
-                # Truco para guardar respetando indices
                 df_master = leer_productos()
                 df_master.loc[edited.index] = edited
                 guardar_productos(df_master)
                 st.success("Guardado")
         else:
-            # VISTA MOVIL
             for idx, row in df.iterrows():
                 card_visual(row, idx, es_admin=True)
-                
     with tab2:
         st.dataframe(leer_ventas(), use_container_width=True)
 
@@ -387,7 +323,6 @@ else:
     with st.sidebar:
         try: st.image(LOGO_PATH, use_container_width=True)
         except: st.title("BDS")
-        
         st.write(f"👤 **{st.session_state.username}**")
         st.write(f"🔑 {st.session_state.user_role.upper()}")
         st.divider()
