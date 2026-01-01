@@ -3,6 +3,8 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 from difflib import SequenceMatcher
+import time
+import unicodedata # ✅ FIX 1: Import necesario para tildes
 
 # ========== CONFIGURACIÓN DEL LOCAL ==========
 NOMBRE_LOCAL = "BDS Electrodomésticos"
@@ -42,21 +44,33 @@ def formato_guaranies(valor):
     except:
         return "0"
 
+def normalizar_texto(texto):
+    """Elimina tildes y convierte a minúsculas para comparaciones"""
+    if not isinstance(texto, str):
+        return str(texto).lower()
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    ).lower().strip()
+
 def fuzzy_match(query, text, threshold=0.6):
-    """Implementa fuzzy matching usando SequenceMatcher nativo de Python"""
+    """
+    ✅ FIX 3: Fuzzy matching mejorado con normalización de caracteres (tildes/ñ)
+    """
     if not query or not text:
         return False
     
-    query = query.lower().strip()
-    text = text.lower().strip()
+    # Normalizamos ambos textos (adiós problemas de tildes)
+    query_norm = normalizar_texto(query)
+    text_norm = normalizar_texto(text)
     
-    # Coincidencia exacta
-    if query in text:
+    # Coincidencia exacta en la versión normalizada
+    if query_norm in text_norm:
         return True
     
     # Fuzzy matching por palabras
-    query_words = query.split()
-    text_words = text.split()
+    query_words = query_norm.split()
+    text_words = text_norm.split()
     
     for q_word in query_words:
         for t_word in text_words:
@@ -82,7 +96,7 @@ def busqueda_inteligente(df, query, categoria=None, marca=None):
     if query:
         mascara = df_resultado.apply(
             lambda row: fuzzy_match(query, str(row['PRODUCTO'])) or 
-                       fuzzy_match(query, str(row['MARCA'])),
+                        fuzzy_match(query, str(row['MARCA'])),
             axis=1
         )
         df_resultado = df_resultado[mascara]
@@ -90,7 +104,7 @@ def busqueda_inteligente(df, query, categoria=None, marca=None):
     return df_resultado
 # ================================
 
-# Estilos CSS - REFACTORIZADOS MOBILE FIRST
+# Estilos CSS
 st.markdown("""
 <style>
     /* ========== VARIABLES DE COLOR ========== */
@@ -494,7 +508,7 @@ def actualizar_stock(df_productos, producto_nombre, cantidad_vendida):
     df_productos.loc[mask, 'STOCK'] = df_productos.loc[mask, 'STOCK'] - cantidad_vendida
     guardar_productos(df_productos)
 
-# ========== TARJETA DE PRODUCTO REFACTORIZADA ==========
+# ========== TARJETA DE PRODUCTO REFACTORIZADA (VENDEDOR) ==========
 def renderizar_tarjeta_producto(producto, index):
     """Tarjeta optimizada mobile-first con formato paraguayo"""
     
@@ -532,7 +546,6 @@ def renderizar_tarjeta_producto(producto, index):
             <div class="producto-marca">{marca}</div>
         </div>
         
-        <!-- PRECIO PRINCIPAL - PRIMERO Y MÁS GRANDE -->
         <div class="precio-principal">
             <div class="precio-label">💳 Precio Contado</div>
             <div class="precio-valor">
@@ -540,7 +553,6 @@ def renderizar_tarjeta_producto(producto, index):
             </div>
         </div>
         
-        <!-- Precios secundarios -->
         <div class="precios-secundarios">
             <div class="precio-cuota-box">
                 <div class="precio-cuota-label">6 Cuotas</div>
@@ -552,7 +564,6 @@ def renderizar_tarjeta_producto(producto, index):
             </div>
         </div>
         
-        <!-- Stock y categoría -->
         <div>
             <span class="stock-badge {stock_class}">{stock_icon} {stock_text}</span>
             <span class="categoria-badge">📂 {categoria}</span>
@@ -620,7 +631,6 @@ def renderizar_tarjeta_producto(producto, index):
                             )
                             st.success("🎉 ¡Venta registrada!")
                             st.session_state[f'venta_{index}'] = False
-                            import time
                             time.sleep(1.2)
                             st.rerun()
                         except Exception as e:
@@ -740,7 +750,7 @@ def panel_vendedor():
             disponibles = len(df_productos[df_productos['STOCK'] > 0])
             st.metric("✅ Disponibles", disponibles)
 
-# ========== PANEL ADMIN ==========
+# ========== PANEL ADMIN (RENOVADO CON VISTA MOVIL) ==========
 def panel_administrador():
     st.title("⚙️ Administración")
     st.markdown(f"**{st.session_state.username}**")
@@ -753,45 +763,178 @@ def panel_administrador():
         try:
             df_productos = leer_productos()
             
-            st.info("💡 Edita y presiona 'Guardar Cambios'")
+            # --- AQUÍ EMPIEZA LA MAGIA MÓVIL ---
             
-            columnas = ['PRODUCTO', 'MARCA', 'CONTADO', '6 CUOTAS', '12 CUOTAS', 'STOCK', 'CATEGORIA']
-            df_edit = df_productos[columnas]
-            
-            df_editado = st.data_editor(
-                df_edit,
-                num_rows="dynamic",
-                use_container_width=True,
-                column_config={
-                    "PRODUCTO": st.column_config.TextColumn("Producto", width="large", required=True),
-                    "MARCA": st.column_config.TextColumn("Marca", width="medium", required=True),
-                    "CONTADO": st.column_config.NumberColumn("Contado", format="₲ %d", required=True),
-                    "6 CUOTAS": st.column_config.NumberColumn("6 Cuotas", format="₲ %d", required=True),
-                    "12 CUOTAS": st.column_config.NumberColumn("12 Cuotas", format="₲ %d", required=True),
-                    "STOCK": st.column_config.NumberColumn("Stock", format="%d", required=True),
-                    "CATEGORIA": st.column_config.TextColumn("Categoría", width="medium", required=True)
-                },
-                hide_index=True,
-                key="editor"
-            )
-            
+            # Toggle para vista móvil (Switch)
+            vista_movil = st.toggle("📱 Vista Móvil (Tarjetas)", value=True)
+
+            if not vista_movil:
+                # ==========================
+                # VISTA ESCRITORIO (TABLA)
+                # ==========================
+                st.info("💡 Edita y presiona 'Guardar Cambios' al final")
+                
+                columnas = ['PRODUCTO', 'MARCA', 'CONTADO', '6 CUOTAS', '12 CUOTAS', 'STOCK', 'CATEGORIA']
+                df_edit = df_productos[columnas]
+                
+                df_editado = st.data_editor(
+                    df_edit,
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    column_config={
+                        "PRODUCTO": st.column_config.TextColumn("Producto", width="large", required=True),
+                        "MARCA": st.column_config.TextColumn("Marca", width="medium", required=True),
+                        "CONTADO": st.column_config.NumberColumn("Contado", format="₲ %d", required=True),
+                        "6 CUOTAS": st.column_config.NumberColumn("6 Cuotas", format="₲ %d", required=True),
+                        "12 CUOTAS": st.column_config.NumberColumn("12 Cuotas", format="₲ %d", required=True),
+                        "STOCK": st.column_config.NumberColumn("Stock", format="%d", required=True),
+                        "CATEGORIA": st.column_config.TextColumn("Categoría", width="medium", required=True)
+                    },
+                    hide_index=True,
+                    key="editor"
+                )
+            else:
+                # ==========================
+                # VISTA MÓVIL (TARJETAS)
+                # ==========================
+                st.info("💡 Toca 'Editar' en la tarjeta del producto que quieras modificar")
+                
+                # Inicializar df_editado con el DataFrame original en una variable de sesión
+                if 'df_editado_mobile' not in st.session_state:
+                    st.session_state.df_editado_mobile = df_productos.copy()
+                
+                # Usamos la variable de sesión para renderizar
+                df_render = st.session_state.df_editado_mobile
+                
+                for idx, row in df_render.iterrows():
+                    with st.container(border=True):
+                        # FILA SUPERIOR
+                        col_nombre, col_stock = st.columns([3, 1])
+                        
+                        with col_nombre:
+                            st.markdown(f"### {row['PRODUCTO']}")
+                            st.caption(f"🏷️ {row['MARCA']} | 📂 {row['CATEGORIA']}")
+                        
+                        with col_stock:
+                            stock_val = int(row['STOCK'])
+                            stock_color = "🔴" if stock_val < 3 else "🟢"
+                            st.markdown(f"<div style='text-align: right; font-size: 24px; font-weight: bold;'>{stock_color} {stock_val}</div>", unsafe_allow_html=True)
+                        
+                        st.divider()
+                        
+                        # FILA INFERIOR - Precios
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.markdown("**💳 Contado**")
+                            st.markdown(f"₲ {formato_guaranies(row['CONTADO'])}")
+                        
+                        with col2:
+                            st.markdown("**📅 6 Cuotas**")
+                            st.markdown(f"₲ {formato_guaranies(row['6 CUOTAS'])}")
+                        
+                        with col3:
+                            st.markdown("**📅 12 Cuotas**")
+                            st.markdown(f"₲ {formato_guaranies(row['12 CUOTAS'])}")
+                        
+                        # Botón editar
+                        if st.button("✏️ Editar", key=f"edit_{idx}", use_container_width=True):
+                            st.session_state[f'editing_{idx}'] = True
+                            st.rerun()
+                        
+                        # Formulario de edición
+                        if st.session_state.get(f'editing_{idx}', False):
+                            with st.expander("📝 Editar Producto", expanded=True):
+                                nuevo_nombre = st.text_input("Producto", value=row['PRODUCTO'], key=f"nombre_{idx}")
+                                nuevo_marca = st.text_input("Marca", value=row['MARCA'], key=f"marca_{idx}")
+                                nueva_cat = st.text_input("Categoría", value=row['CATEGORIA'], key=f"cat_{idx}")
+                                
+                                col_a, col_b, col_c = st.columns(3)
+                                with col_a:
+                                    nuevo_contado = st.number_input("Contado", value=int(row['CONTADO']), key=f"cont_{idx}")
+                                with col_b:
+                                    nuevo_6 = st.number_input("6 Cuotas", value=int(row['6 CUOTAS']), key=f"6c_{idx}")
+                                with col_c:
+                                    nuevo_12 = st.number_input("12 Cuotas", value=int(row['12 CUOTAS']), key=f"12c_{idx}")
+                                
+                                nuevo_stock = st.number_input("Stock", value=int(row['STOCK']), min_value=0, key=f"stock_{idx}")
+                                
+                                col_x, col_y = st.columns(2)
+                                with col_x:
+                                    if st.button("💾 Aplicar Cambios", key=f"save_{idx}", use_container_width=True):
+                                        # ✅ FIX 2: Validación de datos vacíos
+                                        if not nuevo_nombre.strip():
+                                            st.error("❌ El nombre del producto no puede estar vacío")
+                                        else:
+                                            # Guardar en la variable temporal de sesión
+                                            st.session_state.df_editado_mobile.at[idx, 'PRODUCTO'] = nuevo_nombre
+                                            st.session_state.df_editado_mobile.at[idx, 'MARCA'] = nuevo_marca
+                                            st.session_state.df_editado_mobile.at[idx, 'CATEGORIA'] = nueva_cat
+                                            st.session_state.df_editado_mobile.at[idx, 'CONTADO'] = nuevo_contado
+                                            st.session_state.df_editado_mobile.at[idx, '6 CUOTAS'] = nuevo_6
+                                            st.session_state.df_editado_mobile.at[idx, '12 CUOTAS'] = nuevo_12
+                                            st.session_state.df_editado_mobile.at[idx, 'STOCK'] = nuevo_stock
+                                            
+                                            st.session_state[f'editing_{idx}'] = False
+                                            st.success("✅ Cambios aplicados. Presiona 'Guardar en Base de Datos' abajo para confirmar.")
+                                            time.sleep(1)
+                                            st.rerun()
+                                
+                                with col_y:
+                                    if st.button("❌ Cancelar", key=f"cancel_{idx}", use_container_width=True):
+                                        st.session_state[f'editing_{idx}'] = False
+                                        st.rerun()
+
+            # --- BOTONES DE ACCIÓN (COMUNES PARA AMBAS VISTAS) ---
+            st.markdown("---")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("💾 Guardar Cambios", use_container_width=True, type="primary"):
+                # =======================================================
+                # ✅ FIX 1: VALIDACIÓN CRÍTICA DE ORIGEN DE DATOS
+                # =======================================================
+                if st.button("💾 Guardar Cambios en Base de Datos", use_container_width=True, type="primary"):
                     try:
-                        cols_orig = ['CATEGORIA', 'MARCA', 'PRODUCTO', 'CONTADO', '12 CUOTAS', '6 CUOTAS', 'STOCK']
-                        df_reord = df_editado[['CATEGORIA', 'MARCA', 'PRODUCTO', 'CONTADO', '12 CUOTAS', '6 CUOTAS', 'STOCK']]
-                        guardar_productos(df_reord)
-                        st.success("✅ Guardado exitosamente")
+                        cols_necesarias = ['CATEGORIA', 'MARCA', 'PRODUCTO', 'CONTADO', '12 CUOTAS', '6 CUOTAS', 'STOCK']
+                        
+                        # Determinar fuente de datos correcta según la vista activa
+                        if vista_movil:
+                            # En móvil, usamos la sesión donde hemos ido aplicando cambios
+                            if 'df_editado_mobile' not in st.session_state:
+                                st.error("❌ No hay datos móviles en memoria. Recarga la página.")
+                                st.stop()
+                            df_origen = st.session_state.df_editado_mobile
+                        else:
+                            # En escritorio, usamos lo que sale del st.data_editor
+                            df_origen = df_editado
+                        
+                        # Verificación de integridad de columnas
+                        if not all(col in df_origen.columns for col in cols_necesarias):
+                            st.error("❌ Error Crítico: Faltan columnas en los datos. Recarga la página.")
+                            st.stop()
+                        
+                        # Filtrar y guardar
+                        df_final = df_origen[cols_necesarias]
+                        guardar_productos(df_final)
+                        
+                        # Limpieza post-guardado
+                        if 'df_editado_mobile' in st.session_state:
+                            del st.session_state.df_editado_mobile
+                            
+                        st.success("✅ ¡Base de datos actualizada exitosamente!")
+                        time.sleep(1.5)
                         st.rerun()
+                        
                     except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
+                        st.error(f"❌ Error al guardar: {str(e)}")
             
             with col2:
-                if st.button("🔄 Recargar", use_container_width=True):
+                if st.button("🔄 Recargar Datos", use_container_width=True):
+                    if 'df_editado_mobile' in st.session_state:
+                        del st.session_state.df_editado_mobile
                     st.cache_data.clear()
                     st.rerun()
             
+            # --- ESTADÍSTICAS ---
             st.markdown("---")
             st.markdown("### 📊 Estadísticas")
             col1, col2, col3, col4 = st.columns(4)
@@ -808,7 +951,7 @@ def panel_administrador():
                 st.metric("Sin Stock", sin)
             
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
+            st.error(f"❌ Error general en panel admin: {str(e)}")
     
     with tab2:
         st.subheader("Historial de Ventas")
