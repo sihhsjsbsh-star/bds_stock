@@ -22,7 +22,7 @@ USUARIOS = {
     "vendedor": {
         "password": "ventas123",
         "rol": "vendedor",
-        "nombre_completo": "vendedor"
+        "nombre_completo": "Walter"
     }
 }
 # ================================================
@@ -545,3 +545,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
