@@ -155,7 +155,7 @@ def card_visual(row, idx, es_admin=False):
     nom = str(row['PRODUCTO'])
     marca = str(row['MARCA'])
     cat = str(row['CATEGORIA'])
-    stk = int(row['STOCK']) # Ya está limpio por leer_productos
+    stk = int(row['STOCK']) 
     p1 = float(row['CONTADO'])
     p6 = float(row['6 CUOTAS'])
     p12 = float(row['12 CUOTAS'])
@@ -250,7 +250,6 @@ def login_page():
         except: st.title("🔴 BDS")
         
         st.markdown("### Bienvenido al Sistema")
-        st.markdown("<div style='color:#666; margin-bottom:20px;'>Ingresa tus credenciales para continuar</div>", unsafe_allow_html=True)
         
         u = st.text_input("Usuario", placeholder="Ej: Rosana")
         p = st.text_input("Contraseña", type="password")
@@ -258,11 +257,25 @@ def login_page():
         st.markdown("<br>", unsafe_allow_html=True)
         
         if st.button("🚀 INICIAR SESIÓN", use_container_width=True):
-            creds = {"Rosana":"bdse1975", "vendedor":"ventas123"}
+            # === GESTIÓN DE USUARIOS ===
+            creds = {
+                "Rosana": "bdse1975",
+                "vendedor": "ventas123",
+                "Yuliany": "yuli2026",
+                "Externo": "ext123"
+            }
+            
+            user_info = {
+                "Rosana":   {"role": "admin",    "name": "Rosana Da Silva"},
+                "vendedor": {"role": "vendedor", "name": "Walter"},
+                "Yuliany":  {"role": "vendedor", "name": "Yuliany"},
+                "Externo":  {"role": "vendedor", "name": "Vendedor Externo"}
+            }
+
             if u in creds and creds[u] == p:
                 st.session_state.logged_in = True
-                st.session_state.user_role = "admin" if u == "Rosana" else "vendedor"
-                st.session_state.username = "Walter" if u == "vendedor" else "Rosana Da Silva"
+                st.session_state.user_role = user_info[u]["role"]
+                st.session_state.username = user_info[u]["name"]
                 st.rerun()
             else:
                 st.error("Credenciales incorrectas")
@@ -285,6 +298,8 @@ def panel_vendedor():
 
 def panel_admin():
     st.title("⚙️ Hola, Rosana")
+    
+    # Notificación de cambios pendientes
     if 'mob_q' in st.session_state and st.session_state.mob_q:
         st.info(f"Tienes {len(st.session_state.mob_q)} cambios pendientes de guardar.")
         if st.button("💾 GUARDAR TODO EN BD", type="primary"):
@@ -296,10 +311,13 @@ def panel_admin():
             st.session_state.mob_q = {}
             st.success("¡Base de datos actualizada!"); time.sleep(1); st.rerun()
 
-    tab1, tab2 = st.tabs(["INVENTARIO", "VENTAS"])
+    # TRES PESTAÑAS: Inventario, Ranking, Caja
+    tab1, tab2, tab3 = st.tabs(["📦 INVENTARIO", "📈 RANKING", "🛒 CAJA (VENDER)"])
+    
+    # --- TAB 1: GESTIÓN ---
     with tab1:
         c1, c2 = st.columns([3,1])
-        q = c1.text_input("Buscar en inventario...")
+        q = c1.text_input("Buscar para editar...")
         vista_movil = c2.toggle("Vista Móvil", value=True)
         
         df = leer_productos()
@@ -319,21 +337,52 @@ def panel_admin():
             for idx, row in df.iterrows():
                 card_visual(row, idx, es_admin=True)
 
-        # === SECCIÓN DE MÉTRICAS RECUPERADA ===
         st.markdown("---")
-        st.subheader("📊 RESUMEN DEL IMPERIO")
-        
         if not df.empty:
             total_plata = (df['STOCK'] * df['CONTADO']).sum()
             items_bajos = df[df['STOCK'] <= 2].shape[0]
-            
-            col_m1, col_m2, col_m3 = st.columns(3)
-            col_m1.metric("📦 Valor en Depósito", f"₲ {formato_guaranies(total_plata)}")
-            col_m2.metric("⚠️ Stock Crítico", f"{items_bajos} productos", delta="-URGENTE" if items_bajos > 0 else "Todo OK", delta_color="inverse")
-            col_m3.metric("🔢 Total Items", f"{len(df)}")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Valor Stock", f"₲ {formato_guaranies(total_plata)}")
+            c2.metric("Stock Crítico", f"{items_bajos}", delta_color="inverse")
+            c3.metric("Total Items", f"{len(df)}")
 
+    # --- TAB 2: RANKING ---
     with tab2:
-        st.dataframe(leer_ventas(), use_container_width=True)
+        df_v = leer_ventas()
+        if not df_v.empty:
+            st.subheader("🏆 Ranking de Vendedores")
+            
+            # Limpieza y Cálculo
+            df_v['MONTO_TOTAL'] = pd.to_numeric(df_v['MONTO_TOTAL'], errors='coerce').fillna(0)
+            ranking = df_v.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index()
+            ranking = ranking.sort_values(by='MONTO_TOTAL', ascending=False)
+            
+            # Visualización
+            ranking_display = ranking.copy()
+            ranking_display['TOTAL VENDIDO'] = ranking_display['MONTO_TOTAL'].apply(lambda x: f"₲ {formato_guaranies(x)}")
+            
+            c_rank1, c_rank2 = st.columns([1, 2])
+            c_rank1.dataframe(ranking_display[['VENDEDOR', 'TOTAL VENDIDO']], hide_index=True, use_container_width=True)
+            c_rank2.bar_chart(ranking, x='VENDEDOR', y='MONTO_TOTAL', color="#D32F2F")
+            
+            st.divider()
+            st.dataframe(df_v, use_container_width=True)
+        else:
+            st.info("No hay ventas registradas aún.")
+
+    # --- TAB 3: MODO CAJA (ADMIN) ---
+    with tab3:
+        st.info("Modo Caja: Venta directa desde cuenta Admin")
+        q_venta = st.text_input("🔍 Buscar producto...", key="search_admin_sell")
+        
+        df_prod = leer_productos()
+        if q_venta:
+            mask = df_prod.apply(lambda r: fuzzy_match(q_venta, str(r['PRODUCTO'])) or fuzzy_match(q_venta, str(r['MARCA'])), axis=1)
+            df_prod = df_prod[mask]
+        
+        for idx, row in df_prod.iterrows():
+            # Forzamos es_admin=False para ver botón de venta
+            card_visual(row, idx, es_admin=False)
 
 # ========== MAIN ==========
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
