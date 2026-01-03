@@ -63,6 +63,15 @@ st.markdown("""
 
 # ========== LÓGICA & DATOS ==========
 
+def obtener_saludo():
+    hora = datetime.now().hour
+    if 5 <= hora < 12:
+        return "☀️ Buenos días"
+    elif 12 <= hora < 19:
+        return "🌤️ Buenas tardes"
+    else:
+        return "🌙 Buenas noches"
+
 def normalizar_texto(texto):
     if not isinstance(texto, str): return str(texto).lower()
     return ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn').lower().strip()
@@ -88,7 +97,6 @@ def leer_productos():
         df = df.dropna(subset=['PRODUCTO'])
         df = df[df['PRODUCTO'].str.strip() != ''] 
         
-        # Limpieza de categorías para el filtro
         if 'CATEGORIA' in df.columns:
             df['CATEGORIA'] = df['CATEGORIA'].astype(str).str.strip().str.upper()
         else:
@@ -99,7 +107,6 @@ def leer_productos():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # ID BLINDADO
         df['ID_REF'] = [hashlib.md5(f"{r.PRODUCTO}_{i}".encode()).hexdigest()[:10] for i, r in df.iterrows()]
         return df
     except Exception as e: 
@@ -169,7 +176,6 @@ def popup_venta(item, usuario):
     </div>
     """, unsafe_allow_html=True)
     
-    # AQUÍ ESTABA EL ERROR: Asegúrate de copiar esto bien
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_ok, col_no = st.columns(2)
@@ -188,40 +194,31 @@ def popup_venta(item, usuario):
 # ========== INTERFAZ POS ==========
 
 def render_pos_interface(usuario):
-    # Carga de datos
+    saludo = obtener_saludo()
+    st.title(f"{saludo}, {usuario}")
+    
     df = leer_productos()
     
-    # --- FILTRO POR CATEGORÍA ---
     c_cat, c_search = st.columns([1, 2])
-    
     with c_cat:
-        # Obtenemos categorías únicas y ordenadas
-        try:
-            categorias = sorted(df['CATEGORIA'].unique().tolist())
-        except:
-            categorias = ["GENERAL"]
-            
+        try: categorias = sorted(df['CATEGORIA'].unique().tolist())
+        except: categorias = ["GENERAL"]
         categorias.insert(0, "TODAS")
         cat_seleccionada = st.selectbox("📂 Categoría", options=categorias)
     
     with c_search:
         busqueda = st.text_input("🔎 Buscar producto...", placeholder="Nombre, marca...")
 
-    # --- LÓGICA DE FILTRADO ---
     df_filtro = df.copy()
-    
-    # 1. Filtro Categoría
     if cat_seleccionada != "TODAS":
         df_filtro = df_filtro[df_filtro['CATEGORIA'] == cat_seleccionada]
     
-    # 2. Filtro Texto
     if busqueda:
         mask = df_filtro.apply(lambda r: fuzzy_match(busqueda, str(r['PRODUCTO'])) or fuzzy_match(busqueda, str(r['MARCA'])), axis=1)
         df_filtro = df_filtro[mask]
 
     st.divider()
 
-    # --- RENDERIZADO DE LISTA ---
     if not df_filtro.empty:
         for i, row in df_filtro.iterrows():
             id_unico = f"{row['ID_REF']}_{i}" 
@@ -254,9 +251,9 @@ def render_pos_interface(usuario):
 # ========== PANEL ADMIN ==========
 
 def panel_admin():
-    st.title("⚙️ Panel de Control")
+    saludo = obtener_saludo()
+    st.title(f"{saludo}, {st.session_state.username}")
     
-    # Métricas
     df = leer_productos()
     if not df.empty:
         total_plata = (df['STOCK'] * df['CONTADO']).sum()
@@ -276,10 +273,42 @@ def panel_admin():
             st.session_state.mob_q = {}
             st.success("Guardado"); st.rerun()
 
-    tab1, tab2, tab3 = st.tabs(["🛒 CAJA (POS)", "📦 GESTIÓN INVENTARIO", "📊 REPORTES"])
+    tab1, tab2, tab3 = st.tabs(["🛒 CAJA (POS)", "📦 GESTIÓN INVENTARIO", "🏆 RANKING & VENTAS"])
     
     with tab1:
-        render_pos_interface(st.session_state.username)
+        # Reutilizamos la lógica POS pero sin repetir el titulo grande
+        df_pos = leer_productos()
+        c_cat, c_search = st.columns([1, 2])
+        with c_cat:
+            try: cats = sorted(df_pos['CATEGORIA'].unique().tolist())
+            except: cats = ["GENERAL"]
+            cats.insert(0, "TODAS")
+            sel_cat = st.selectbox("Categoría POS", options=cats, key="cat_admin")
+        with c_search:
+            q_pos = st.text_input("Buscar POS", key="q_admin")
+        
+        df_f = df_pos.copy()
+        if sel_cat != "TODAS": df_f = df_f[df_f['CATEGORIA'] == sel_cat]
+        if q_pos:
+            mask = df_f.apply(lambda r: fuzzy_match(q_pos, str(r['PRODUCTO'])) or fuzzy_match(q_pos, str(r['MARCA'])), axis=1)
+            df_f = df_f[mask]
+
+        if not df_f.empty:
+            for i, row in df_f.iterrows():
+                id_u = f"adm_{row['ID_REF']}_{i}"
+                stk = int(row['STOCK'])
+                st.markdown(f"""
+                <div class="product-card-mini">
+                    <div style="flex:3;">
+                        <div class="mini-title">{row['PRODUCTO']}</div>
+                        <div style="font-size:11px; color:#666;">{row['MARCA']}</div>
+                    </div>
+                    <div style="flex:1; text-align:right;">
+                        <div class="mini-price">₲ {formato_guaranies(row['CONTADO'])}</div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+                if stk > 0:
+                    if st.button("🛒 VENDER", key=id_u): popup_venta(row, st.session_state.username)
         
     with tab2:
         columnas_visibles = [c for c in df.columns if c != 'ID_REF']
@@ -291,19 +320,59 @@ def panel_admin():
     with tab3:
         df_v = leer_ventas()
         if not df_v.empty:
-            st.subheader("🏆 Ranking Vendedores")
-            df_v['MONTO_TOTAL'] = pd.to_numeric(df_v['MONTO_TOTAL'], errors='coerce').fillna(0)
-            ranking = df_v.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index().sort_values(by='MONTO_TOTAL', ascending=False)
+            st.subheader("🥇 Ranking de Vendedores")
             
-            c_rank1, c_rank2 = st.columns([1, 2])
-            ranking_display = ranking.copy()
-            ranking_display['TOTAL'] = ranking_display['MONTO_TOTAL'].apply(lambda x: f"₲ {formato_guaranies(x)}")
-            c_rank1.dataframe(ranking_display[['VENDEDOR', 'TOTAL']], hide_index=True, use_container_width=True)
-            c_rank2.bar_chart(ranking, x='VENDEDOR', y='MONTO_TOTAL', color="#2E7D32")
+            # --- FILTRO POR MES ---
+            df_v['FECHA_DT'] = pd.to_datetime(df_v['FECHA'], errors='coerce')
+            df_v['MES_ANO'] = df_v['FECHA_DT'].dt.strftime('%Y-%m') # Formato Ordenable
+            
+            # Crear lista de meses legible en español
+            meses_disp = sorted(df_v['MES_ANO'].dropna().unique().tolist(), reverse=True)
+            meses_map = {m: datetime.strptime(m, '%Y-%m').strftime('%B %Y').capitalize() for m in meses_disp}
+            opciones_filtro = ["HISTÓRICO GLOBAL"] + [meses_map[m] for m in meses_disp]
+            
+            filtro_mes = st.selectbox("📅 Filtrar por Periodo", opciones_filtro)
+            
+            # Aplicar Filtro
+            df_ranking = df_v.copy()
+            if filtro_mes != "HISTÓRICO GLOBAL":
+                # Invertir el map para buscar el key original YYYY-MM
+                mes_seleccionado_key = [k for k, v in meses_map.items() if v == filtro_mes][0]
+                df_ranking = df_ranking[df_ranking['MES_ANO'] == mes_seleccionado_key]
+
+            # --- CÁLCULO DE RANKING ---
+            df_ranking['MONTO_TOTAL'] = pd.to_numeric(df_ranking['MONTO_TOTAL'], errors='coerce').fillna(0)
+            ranking = df_ranking.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index().sort_values(by='MONTO_TOTAL', ascending=False)
+            
+            # Asignar Medallas
+            medals = ['🥇', '🥈', '🥉']
+            ranking['POS'] = range(1, len(ranking) + 1)
+            ranking['MEDALLA'] = ranking['POS'].apply(lambda x: medals[x-1] if x <= 3 else str(x))
+            
+            # Formato Visual
+            ranking_display = pd.DataFrame()
+            ranking_display['#'] = ranking['MEDALLA']
+            ranking_display['VENDEDOR'] = ranking['VENDEDOR']
+            ranking_display['TOTAL VENDIDO'] = ranking['MONTO_TOTAL'] # Mantener numérico para barra
+            
+            # TABLA ESTILIZADA (Sin gráfico feo)
+            st.dataframe(
+                ranking_display,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "TOTAL VENDIDO": st.column_config.ProgressColumn(
+                        "Volumen de Ventas",
+                        format="₲ %d",
+                        min_value=0,
+                        max_value=int(ranking['MONTO_TOTAL'].max() * 1.1) if not ranking.empty else 100,
+                    )
+                }
+            )
             
             st.divider()
-            st.subheader("📝 Historial")
-            st.dataframe(df_v, use_container_width=True)
+            st.subheader("📜 Detalle de Ventas")
+            st.dataframe(df_ranking.drop(columns=['FECHA_DT', 'MES_ANO']), use_container_width=True)
         else: st.info("No hay ventas registradas.")
 
 # ========== LOGIN ==========
@@ -345,8 +414,10 @@ else:
         try: st.image(LOGO_PATH, use_container_width=True)
         except: pass
         st.divider()
-        st.markdown(f"👤 **{st.session_state.username}**")
-        st.markdown(f"🔑 Rol: **{st.session_state.user_role.upper()}**")
+        # Saludo también en Sidebar
+        saludo_sidebar = obtener_saludo()
+        st.markdown(f"{saludo_sidebar},<br>**{st.session_state.username}**", unsafe_allow_html=True)
+        st.caption(f"Rol: {st.session_state.user_role.upper()}")
         st.divider()
         if st.button("Cerrar Sesión"):
             st.session_state.clear(); st.rerun()
@@ -354,5 +425,4 @@ else:
     if st.session_state.user_role == "admin":
         panel_admin()
     else:
-        st.title(f"Punto de Venta")
         render_pos_interface(st.session_state.username)
