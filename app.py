@@ -5,13 +5,13 @@ from datetime import datetime
 from difflib import SequenceMatcher
 import time
 import unicodedata
+import hashlib
 
 # ========== CONFIGURACIÓN GLOBAL ==========
 NOMBRE_LOCAL = "BDS Electrodomésticos"
 LOGO_PATH = "bds_image.jpg"
 # ==========================================
 
-# Configuración de página
 st.set_page_config(
     page_title=NOMBRE_LOCAL,
     page_icon="🔴",
@@ -19,70 +19,105 @@ st.set_page_config(
     initial_sidebar_state="collapsed" if 'logged_in' not in st.session_state or not st.session_state.logged_in else "expanded"
 )
 
-# ========== ESTILOS CSS "PREMIUM" ==========
+# ========== ESTILOS CSS "POS PROFESIONAL" ==========
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    
+    /* Variables Semánticas */
     :root {
-        --primary: #D32F2F; --primary-dark: #B71C1C;
-        --bg-gray: #F8F9FA; --card-bg: #FFFFFF; --text-main: #1F2937;
+        --success: #2E7D32; /* Verde Dólar */
+        --neutral: #1976D2; /* Azul Acción */
+        --danger: #D32F2F;  /* Rojo Alerta */
+        --bg-ticket: #FFFFFF;
     }
-    .stApp { background-color: var(--bg-gray); }
+
+    .stApp { background-color: #F3F4F6; }
+
+    /* TICKET DE VENTA (Columna Derecha) */
+    .ticket-container {
+        background-color: var(--bg-ticket);
+        border: 2px solid #E5E7EB;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    .ticket-header {
+        text-align: center;
+        border-bottom: 2px dashed #E5E7EB;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+        font-weight: 800;
+        color: #374151;
+        letter-spacing: 1px;
+    }
+    .ticket-total {
+        background-color: #ECFDF5;
+        color: var(--success);
+        font-size: 28px;
+        font-weight: 900;
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #6EE7B7;
+        margin: 15px 0;
+    }
+
+    /* CARDS COMPACTAS (Columna Izquierda) */
+    .product-card-mini {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        border-left: 5px solid var(--neutral);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        display: flex;
+        justify_content: space-between;
+        align-items: center;
+        transition: transform 0.1s;
+    }
+    .product-card-mini:hover { transform: scale(1.01); border-left-color: var(--success); }
+    
+    .mini-title { font-weight: 700; font-size: 15px; color: #111827; }
+    .mini-price { font-weight: 800; color: #4B5563; font-size: 14px; }
+    .mini-stock { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #E5E7EB; color: #374151; font-weight: 700; }
+    .stock-low { background: #FEE2E2; color: #991B1B; }
+
+    /* LOGIN */
     .login-card {
         background-color: white; padding: 40px; border-radius: 20px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center;
-        border-top: 5px solid var(--primary);
+        border-top: 5px solid var(--danger);
     }
-    .stButton > button {
-        background-color: var(--primary) !important; color: white !important;
-        border: none; border-radius: 10px; height: 50px; font-weight: 800;
-        text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;
+    
+    /* BOTONES */
+    div.stButton > button:first-child {
+        font-weight: 700;
+        border-radius: 8px;
+        height: 45px;
+        border: none;
+        width: 100%;
     }
-    .stButton > button:hover {
-        background-color: var(--primary-dark) !important;
-        box-shadow: 0 5px 15px rgba(211, 47, 47, 0.4); transform: translateY(-2px);
-    }
-    .product-card {
-        background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px;
-        border: 1px solid #E5E7EB; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        transition: transform 0.2s;
-    }
-    .product-card:hover { border-color: var(--primary); transform: translateY(-3px); }
-    .card-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; line-height: 1.3; }
-    .card-meta { font-size: 12px; color: #6B7280; text-transform: uppercase; font-weight: 600; margin-bottom: 12px; }
-    .price-main {
-        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-        color: white; padding: 12px; border-radius: 8px; text-align: center; margin: 10px 0;
-    }
-    .price-main .label { font-size: 10px; opacity: 0.8; text-transform: uppercase; }
-    .price-main .value { font-size: 24px; font-weight: 900; }
-    .price-sec { background: #F3F4F6; padding: 8px; border-radius: 6px; text-align: center; }
-    .price-sec .label { font-size: 9px; color: #666; font-weight: 700; }
-    .price-sec .value { font-size: 14px; color: #333; font-weight: 700; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; }
-    .badge-ok { background: #DCFCE7; color: #166534; }
-    .badge-low { background: #FEE2E2; color: #991B1B; }
-    [data-testid="stSidebar"] { background-color: white; border-right: 1px solid #E5E7EB; }
-    [data-testid="stSidebar"] img { border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== CEREBRO DE BÚSQUEDA ==========
+# ========== LÓGICA & DATOS ==========
+
 def normalizar_texto(texto):
-    """Quita tildes, ñ y pone minúsculas"""
     if not isinstance(texto, str): return str(texto).lower()
     return ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn').lower().strip()
 
 def fuzzy_match(query, text, threshold=0.7):
-    """Búsqueda inteligente: encuentra similitudes"""
     if not query or not text: return False
-    q = normalizar_texto(query)
-    t = normalizar_texto(text)
-    if q in t: return True
-    return SequenceMatcher(None, q, t).ratio() >= threshold
+    q, t = normalizar_texto(query), normalizar_texto(text)
+    return q in t or SequenceMatcher(None, q, t).ratio() >= threshold
 
-# ========== LÓGICA DE NEGOCIO Y DATOS ==========
+def generar_id_unico(row):
+    # Genera un hash único basado en nombre y marca para identificar productos sin usar el índice
+    raw = f"{row['PRODUCTO']}_{row['MARCA']}".encode('utf-8')
+    return hashlib.md5(raw).hexdigest()[:8]
+
 @st.cache_resource
 def get_connection():
     return st.connection("gsheets", type=GSheetsConnection)
@@ -95,20 +130,16 @@ def formato_guaranies(valor):
 def leer_productos():
     conn = get_connection()
     try: 
-        # 1. Leer hoja
         df = conn.read(worksheet="PRODUCTOS").dropna(how='all')
-        
-        # 2. LIMPIEZA FORZOSA (ANTI-ERRORES)
-        # Convertimos columnas clave a números. Si hay texto basura, pone 0.
         cols_num = ['STOCK', 'CONTADO', '6 CUOTAS', '12 CUOTAS']
         for col in cols_num:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
+        # GENERAR ID ÚNICO (CRÍTICO PARA POS)
+        df['ID_REF'] = df.apply(generar_id_unico, axis=1)
         return df
-    except Exception as e:
-        st.error(f"Error de conexión o datos: {e}") 
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def leer_ventas():
@@ -117,12 +148,10 @@ def leer_ventas():
     except: return pd.DataFrame(columns=['FECHA','VENDEDOR','PRODUCTO','CANTIDAD','TIPO_PAGO','MONTO_TOTAL'])
 
 def guardar_productos(df):
-    cols_check = ['CONTADO', 'STOCK']
-    for c in cols_check:
-        if c in df.columns and (df[c] < 0).any():
-            st.error(f"❌ Error: Valores negativos en {c}"); return False
+    # Antes de guardar, removemos la columna temporal ID_REF si existe
+    df_save = df.drop(columns=['ID_REF'], errors='ignore')
     conn = get_connection()
-    conn.update(worksheet="PRODUCTOS", data=df)
+    conn.update(worksheet="PRODUCTOS", data=df_save)
     st.cache_data.clear()
     return True
 
@@ -138,253 +167,209 @@ def registrar_venta(vendedor, producto, cantidad, tipo_pago, monto_total):
     conn.update(worksheet="VENTAS", data=df)
     st.cache_data.clear()
 
-def actualizar_stock_venta(nombre, cantidad):
+def actualizar_stock_pos(id_ref, cantidad):
     df = leer_productos()
-    mask = df['PRODUCTO'] == nombre
+    # Buscamos por ID ÚNICO, no por índice (mucho más seguro)
+    mask = df['ID_REF'] == id_ref
+    
     if not mask.any(): return False
+    
     idx = df[mask].index[0]
-    stock = int(df.at[idx, 'STOCK'])
-    if stock < cantidad: return False
-    df.at[idx, 'STOCK'] = stock - cantidad
+    stock_actual = int(df.at[idx, 'STOCK'])
+    
+    if stock_actual < cantidad: return False
+    
+    df.at[idx, 'STOCK'] = stock_actual - cantidad
     return guardar_productos(df)
 
-# ========== COMPONENTES VISUALES ==========
+# ========== INTERFAZ POS (CAJA REGISTRADORA) ==========
 
-def card_visual(row, idx, es_admin=False):
-    # Extracción segura de datos
-    nom = str(row['PRODUCTO'])
-    marca = str(row['MARCA'])
-    cat = str(row['CATEGORIA'])
-    stk = int(row['STOCK']) 
-    p1 = float(row['CONTADO'])
-    p6 = float(row['6 CUOTAS'])
-    p12 = float(row['12 CUOTAS'])
+def render_pos_interface(usuario):
+    # Estado de la Caja
+    if 'pos_cart' not in st.session_state: st.session_state.pos_cart = None
     
-    st.markdown(f"""
-    <div class="product-card">
-        <div class="card-title">{nom}</div>
-        <div class="card-meta">{marca} | {cat}</div>
-        <div style="margin-bottom:10px;">
-            <span class="badge {'badge-ok' if stk > 2 else 'badge-low'}">STOCK: {stk}</span>
-        </div>
-        <div class="price-main">
-            <div class="label">PRECIO CONTADO</div>
-            <div class="value">₲ {formato_guaranies(p1)}</div>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div class="price-sec">
-                <div class="label">6 CUOTAS</div>
-                <div class="value">₲ {formato_guaranies(p6)}</div>
-            </div>
-            <div class="price-sec">
-                <div class="label">12 CUOTAS</div>
-                <div class="value">₲ {formato_guaranies(p12)}</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    col_catalogo, col_ticket = st.columns([0.65, 0.35], gap="large")
     
-    # Botonera
-    if not es_admin:
-        if stk > 0:
-            if st.button("🛒 VENDER", key=f"v_{idx}"):
-                st.session_state[f'mod_v_{idx}'] = True
-                st.rerun()
-            
-            if st.session_state.get(f'mod_v_{idx}'):
-                with st.container(border=True):
-                    st.info("Confirmar Venta")
-                    cant = st.number_input("Cant.", 1, stk, 1, key=f"qn_{idx}")
-                    pago = st.selectbox("Pago", ["Contado", "6 Cuotas", "12 Cuotas"], key=f"pg_{idx}")
-                    total = (p1 if pago=="Contado" else (p6 if pago=="6 Cuotas" else p12)) * cant
-                    st.write(f"**Total: ₲ {formato_guaranies(total)}**")
-                    c1, c2 = st.columns(2)
-                    if c1.button("✅ OK", key=f"ok_{idx}"):
-                        if actualizar_stock_venta(nom, cant):
-                            registrar_venta(st.session_state.username, nom, cant, pago, total)
-                            st.success("Listo!")
-                            st.session_state[f'mod_v_{idx}'] = False
-                            time.sleep(1); st.rerun()
-                    if c2.button("❌", key=f"no_{idx}"):
-                        st.session_state[f'mod_v_{idx}'] = False; st.rerun()
+    df = leer_productos()
+
+    # --- COLUMNA IZQUIERDA: CATÁLOGO ---
+    with col_catalogo:
+        st.subheader("📦 Catálogo")
+        busqueda = st.text_input("🔎 Buscar producto...", placeholder="Ej: Split, Licuadora...", label_visibility="collapsed")
+        
+        if busqueda:
+            mask = df.apply(lambda r: fuzzy_match(busqueda, str(r['PRODUCTO'])) or fuzzy_match(busqueda, str(r['MARCA'])), axis=1)
+            df_filtro = df[mask]
         else:
-            st.error("AGOTADO")
-    else:
-        # Admin Edit
-        if st.button("✏️ EDITAR", key=f"e_{idx}"):
-            st.session_state[f'mod_e_{idx}'] = True; st.rerun()
+            df_filtro = df
+
+        # Lista Compacta
+        if not df_filtro.empty:
+            for _, row in df_filtro.iterrows():
+                id_prod = row['ID_REF']
+                stock = int(row['STOCK'])
+                
+                # Diseño Card Mini
+                bg_stock = "stock-low" if stock <= 2 else ""
+                html_card = f"""
+                <div class="product-card-mini">
+                    <div>
+                        <div class="mini-title">{row['PRODUCTO']}</div>
+                        <div style="font-size:12px; color:#6B7280;">{row['MARCA']}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="mini-price">₲ {formato_guaranies(row['CONTADO'])}</div>
+                        <span class="mini-stock {bg_stock}">STOCK: {stock}</span>
+                    </div>
+                </div>
+                """
+                st.markdown(html_card, unsafe_allow_html=True)
+                
+                # Botón de Acción (Azul Neutro)
+                if stock > 0:
+                    if st.button("➕ AGREGAR", key=f"add_{id_prod}"):
+                        st.session_state.pos_cart = row.to_dict()
+                else:
+                    st.button("🚫 AGOTADO", disabled=True, key=f"dis_{id_prod}")
+        else:
+            st.info("No se encontraron productos.")
+
+    # --- COLUMNA DERECHA: EL TICKET (CAJA) ---
+    with col_ticket:
+        st.markdown('<div class="ticket-container">', unsafe_allow_html=True)
+        st.markdown('<div class="ticket-header">🎫 TICKET DE VENTA</div>', unsafe_allow_html=True)
+        
+        item = st.session_state.pos_cart
+        
+        if item:
+            st.markdown(f"**PRODUCTO:**<br>{item['PRODUCTO']}", unsafe_allow_html=True)
+            st.divider()
             
-        if st.session_state.get(f'mod_e_{idx}'):
-            with st.container(border=True):
-                st.warning("Editar Producto")
-                with st.form(key=f"fe_{idx}"):
-                    nn = st.text_input("Nombre", nom)
-                    nm = st.text_input("Marca", marca)
-                    nc = st.text_input("Categoría", cat)
-                    ns = st.number_input("Stock", value=stk)
-                    np1 = st.number_input("Contado", value=int(p1))
-                    np6 = st.number_input("6 Cuotas", value=int(p6))
-                    np12 = st.number_input("12 Cuotas", value=int(p12))
-                    
-                    if st.form_submit_button("💾 GUARDAR"):
-                        if 'mob_q' not in st.session_state: st.session_state.mob_q = {}
-                        new_row = row.to_dict()
-                        new_row.update({
-                            'PRODUCTO':nn, 'MARCA':nm, 'CATEGORIA':nc,
-                            'STOCK':ns, 'CONTADO':np1, '6 CUOTAS':np6, '12 CUOTAS':np12
-                        })
-                        st.session_state.mob_q[idx] = new_row
-                        st.session_state[f'mod_e_{idx}'] = False
-                        st.success("Guardado en cola. Dale a 'GUARDAR CAMBIOS' arriba.")
+            # Controles de Venta
+            stock_max = int(item['STOCK'])
+            cant = st.number_input("Cantidad", min_value=1, max_value=stock_max, value=1)
+            
+            opciones_pago = {
+                "Contado": float(item['CONTADO']),
+                "6 Cuotas": float(item['6 CUOTAS']),
+                "12 Cuotas": float(item['12 CUOTAS'])
+            }
+            pago = st.radio("Forma de Pago", list(opciones_pago.keys()))
+            
+            precio_unit = opciones_pago[pago]
+            total = precio_unit * cant
+            
+            st.markdown(f"""
+            <div class="ticket-total">
+                <div style="font-size:12px; color:#059669; font-weight:600;">TOTAL A PAGAR</div>
+                ₲ {formato_guaranies(total)}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Botones de Acción (Semánticos)
+            col_conf, col_cancel = st.columns(2)
+            
+            with col_conf:
+                # BOTÓN VERDE (Éxito)
+                if st.button("✅ COBRAR", type="primary", use_container_width=True):
+                    if actualizar_stock_pos(item['ID_REF'], cant):
+                        registrar_venta(usuario, item['PRODUCTO'], cant, pago, total)
+                        st.balloons()
+                        st.success("¡Venta Exitosa!")
+                        st.session_state.pos_cart = None
+                        time.sleep(1.5)
                         st.rerun()
-
-# ========== PÁGINAS ==========
-
-def login_page():
-    c1, c2, c3 = st.columns([1, 1.5, 1])
-    with c2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        
-        try: st.image(LOGO_PATH, width=150) 
-        except: st.title("🔴 BDS")
-        
-        st.markdown("### Bienvenido al Sistema")
-        
-        u = st.text_input("Usuario", placeholder="Ej: Rosana")
-        p = st.text_input("Contraseña", type="password")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        if st.button("🚀 INICIAR SESIÓN", use_container_width=True):
-            # === GESTIÓN DE USUARIOS ===
-            creds = {
-                "Rosana": "bdse1975",
-                "vendedor": "ventas123",
-                "Yuliany": "yuli2026",
-                "Externo": "ext123"
-            }
+                    else:
+                        st.error("Error de Stock")
             
-            user_info = {
-                "Rosana":   {"role": "admin",    "name": "Rosana Da Silva"},
-                "vendedor": {"role": "vendedor", "name": "Walter"},
-                "Yuliany":  {"role": "vendedor", "name": "Yuliany"},
-                "Externo":  {"role": "vendedor", "name": "Vendedor Externo"}
-            }
-
-            if u in creds and creds[u] == p:
-                st.session_state.logged_in = True
-                st.session_state.user_role = user_info[u]["role"]
-                st.session_state.username = user_info[u]["name"]
-                st.rerun()
-            else:
-                st.error("Credenciales incorrectas")
+            with col_cancel:
+                # BOTÓN ROJO (Cancelar)
+                if st.button("❌ CANCELAR", use_container_width=True):
+                    st.session_state.pos_cart = None
+                    st.rerun()
+            
+        else:
+            st.markdown("""
+            <div style="text-align:center; padding:40px 0; color:#9CA3AF;">
+                🛒<br>Selecciona un producto<br>para comenzar
+            </div>
+            """, unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-def panel_vendedor():
-    st.title(f"👋 Hola, {st.session_state.username}")
-    q = st.text_input("🔍 ¿Qué desea buscar el cliente?", placeholder="Escribe 'Split', 'Tokyo', etc.")
-    
-    df = leer_productos()
-    
-    if q:
-        mask = df.apply(lambda r: fuzzy_match(q, str(r['PRODUCTO'])) or fuzzy_match(q, str(r['MARCA'])), axis=1)
-        df = df[mask]
-    
-    st.write(f"Encontramos {len(df)} productos")
-    for idx, row in df.iterrows():
-        card_visual(row, idx, es_admin=False)
+# ========== VISTA ADMIN (Gestión + POS) ==========
 
 def panel_admin():
-    st.title("⚙️ Hola, Rosana")
+    st.title("⚙️ Panel de Control")
     
-    # Notificación de cambios pendientes
+    # Cola de guardado (se mantiene igual por seguridad)
     if 'mob_q' in st.session_state and st.session_state.mob_q:
-        st.info(f"Tienes {len(st.session_state.mob_q)} cambios pendientes de guardar.")
-        if st.button("💾 GUARDAR TODO EN BD", type="primary"):
+        st.warning(f"⚠️ {len(st.session_state.mob_q)} cambios sin guardar")
+        if st.button("💾 GUARDAR CAMBIOS AHORA"):
             df = leer_productos()
             for i, data in st.session_state.mob_q.items():
                 if i in df.index:
                     for k,v in data.items(): df.at[i,k]=v
             guardar_productos(df)
             st.session_state.mob_q = {}
-            st.success("¡Base de datos actualizada!"); time.sleep(1); st.rerun()
+            st.success("Guardado"); st.rerun()
 
-    # TRES PESTAÑAS: Inventario, Ranking, Caja
-    tab1, tab2, tab3 = st.tabs(["📦 INVENTARIO", "📈 RANKING", "🛒 CAJA (VENDER)"])
+    tab1, tab2, tab3 = st.tabs(["🛒 CAJA (POS)", "📦 GESTIÓN INVENTARIO", "📊 REPORTES"])
     
-    # --- TAB 1: GESTIÓN ---
     with tab1:
-        c1, c2 = st.columns([3,1])
-        q = c1.text_input("Buscar para editar...")
-        vista_movil = c2.toggle("Vista Móvil", value=True)
+        render_pos_interface(st.session_state.username)
         
-        df = leer_productos()
-        
-        if q:
-            mask = df.apply(lambda r: fuzzy_match(q, str(r['PRODUCTO'])) or fuzzy_match(q, str(r['MARCA'])), axis=1)
-            df = df[mask]
-            
-        if not vista_movil:
-            edited = st.data_editor(df, num_rows="dynamic", use_container_width=True, height=500)
-            if st.button("💾 GUARDAR TABLA"):
-                df_master = leer_productos()
-                df_master.loc[edited.index] = edited
-                guardar_productos(df_master)
-                st.success("Guardado")
-        else:
-            for idx, row in df.iterrows():
-                card_visual(row, idx, es_admin=True)
-
-        st.markdown("---")
-        if not df.empty:
-            total_plata = (df['STOCK'] * df['CONTADO']).sum()
-            items_bajos = df[df['STOCK'] <= 2].shape[0]
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Valor Stock", f"₲ {formato_guaranies(total_plata)}")
-            c2.metric("Stock Crítico", f"{items_bajos}", delta_color="inverse")
-            c3.metric("Total Items", f"{len(df)}")
-
-    # --- TAB 2: RANKING ---
     with tab2:
+        df = leer_productos()
+        edited = st.data_editor(df.drop(columns=['ID_REF'], errors='ignore'), num_rows="dynamic", use_container_width=True, height=500)
+        if st.button("💾 ACTUALIZAR INVENTARIO"):
+            df_master = leer_productos()
+            # Mapeo simple por índice (Admin debe tener cuidado al ordenar)
+            # Idealmente aquí también usaríamos IDs, pero Streamlit data_editor es complejo.
+            # Por ahora mantenemos lógica simple de reemplazo.
+            guardar_productos(edited)
+            st.success("Inventario Actualizado")
+
+    with tab3:
         df_v = leer_ventas()
         if not df_v.empty:
-            st.subheader("🏆 Ranking de Vendedores")
-            
-            # Limpieza y Cálculo
             df_v['MONTO_TOTAL'] = pd.to_numeric(df_v['MONTO_TOTAL'], errors='coerce').fillna(0)
-            ranking = df_v.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index()
-            ranking = ranking.sort_values(by='MONTO_TOTAL', ascending=False)
-            
-            # Visualización
-            ranking_display = ranking.copy()
-            ranking_display['TOTAL VENDIDO'] = ranking_display['MONTO_TOTAL'].apply(lambda x: f"₲ {formato_guaranies(x)}")
-            
-            c_rank1, c_rank2 = st.columns([1, 2])
-            c_rank1.dataframe(ranking_display[['VENDEDOR', 'TOTAL VENDIDO']], hide_index=True, use_container_width=True)
-            c_rank2.bar_chart(ranking, x='VENDEDOR', y='MONTO_TOTAL', color="#D32F2F")
-            
-            st.divider()
+            st.metric("Total Vendido Histórico", f"₲ {formato_guaranies(df_v['MONTO_TOTAL'].sum())}")
             st.dataframe(df_v, use_container_width=True)
         else:
-            st.info("No hay ventas registradas aún.")
-
-    # --- TAB 3: MODO CAJA (ADMIN) ---
-    with tab3:
-        st.info("Modo Caja: Venta directa desde cuenta Admin")
-        q_venta = st.text_input("🔍 Buscar producto...", key="search_admin_sell")
-        
-        df_prod = leer_productos()
-        if q_venta:
-            mask = df_prod.apply(lambda r: fuzzy_match(q_venta, str(r['PRODUCTO'])) or fuzzy_match(q_venta, str(r['MARCA'])), axis=1)
-            df_prod = df_prod[mask]
-        
-        for idx, row in df_prod.iterrows():
-            # Forzamos es_admin=False para ver botón de venta
-            card_visual(row, idx, es_admin=False)
+            st.info("Sin datos.")
 
 # ========== MAIN ==========
+
+def login_page():
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        try: st.image(LOGO_PATH, width=120) 
+        except: st.title("🔴 BDS")
+        st.markdown("### Acceso al Sistema")
+        
+        u = st.text_input("Usuario")
+        p = st.text_input("Contraseña", type="password")
+        
+        if st.button("INGRESAR", use_container_width=True):
+            creds = {"Rosana":"bdse1975", "vendedor":"ventas123", "Yuliany":"yuli2026", "Externo":"ext123"}
+            users = {
+                "Rosana": {"role":"admin", "name":"Rosana Da Silva"},
+                "vendedor": {"role":"vendedor", "name":"Walter"},
+                "Yuliany": {"role":"vendedor", "name":"Yuliany"},
+                "Externo": {"role":"vendedor", "name":"Externo"}
+            }
+            if u in creds and creds[u] == p:
+                st.session_state.logged_in = True
+                st.session_state.user_role = users[u]["role"]
+                st.session_state.username = users[u]["name"]
+                st.rerun()
+            else:
+                st.error("Acceso Denegado")
+        st.markdown('</div>', unsafe_allow_html=True)
+
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
@@ -392,15 +377,15 @@ if not st.session_state.logged_in:
 else:
     with st.sidebar:
         try: st.image(LOGO_PATH, use_container_width=True)
-        except: st.title("BDS")
-        st.write(f"👤 **{st.session_state.username}**")
-        st.write(f"🔑 {st.session_state.user_role.upper()}")
-        st.divider()
-        if st.button("CERRAR SESIÓN"):
+        except: pass
+        st.markdown(f"### Hola, {st.session_state.username}")
+        if st.button("Cerrar Sesión"):
             st.session_state.clear()
             st.rerun()
-            
+
     if st.session_state.user_role == "admin":
         panel_admin()
     else:
-        panel_vendedor()
+        # Vendedores van directo al POS
+        st.title(f"Punto de Venta")
+        render_pos_interface(st.session_state.username)
