@@ -68,25 +68,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== CEREBRO DE BÚSQUEDA (RECUPERADO) ==========
+# ========== CEREBRO DE BÚSQUEDA ==========
 def normalizar_texto(texto):
-    """Quita tildes, ñ y pone minúsculas (Tokyo = tokyo)"""
+    """Quita tildes, ñ y pone minúsculas"""
     if not isinstance(texto, str): return str(texto).lower()
     return ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn').lower().strip()
 
 def fuzzy_match(query, text, threshold=0.7):
-    """Búsqueda inteligente: encuentra similitudes aunque haya errores de dedo"""
+    """Búsqueda inteligente: encuentra similitudes"""
     if not query or not text: return False
     q = normalizar_texto(query)
     t = normalizar_texto(text)
-    
-    # 1. Coincidencia directa (substring)
     if q in t: return True
-    
-    # 2. Coincidencia difusa (si falla la directa)
     return SequenceMatcher(None, q, t).ratio() >= threshold
 
-# ========== LÓGICA DE NEGOCIO ==========
+# ========== LÓGICA DE NEGOCIO Y DATOS ==========
 @st.cache_resource
 def get_connection():
     return st.connection("gsheets", type=GSheetsConnection)
@@ -98,8 +94,21 @@ def formato_guaranies(valor):
 @st.cache_data(ttl=60)
 def leer_productos():
     conn = get_connection()
-    try: return conn.read(worksheet="PRODUCTOS").dropna(how='all')
-    except: return pd.DataFrame()
+    try: 
+        # 1. Leer hoja
+        df = conn.read(worksheet="PRODUCTOS").dropna(how='all')
+        
+        # 2. LIMPIEZA FORZOSA (ANTI-ERRORES)
+        # Convertimos columnas clave a números. Si hay texto basura, pone 0.
+        cols_num = ['STOCK', 'CONTADO', '6 CUOTAS', '12 CUOTAS']
+        for col in cols_num:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        return df
+    except Exception as e:
+        st.error(f"Error de conexión o datos: {e}") 
+        return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def leer_ventas():
@@ -142,10 +151,11 @@ def actualizar_stock_venta(nombre, cantidad):
 # ========== COMPONENTES VISUALES ==========
 
 def card_visual(row, idx, es_admin=False):
-    nom = row['PRODUCTO']
-    marca = row['MARCA']
-    cat = row['CATEGORIA']
-    stk = int(row['STOCK'])
+    # Extracción segura de datos
+    nom = str(row['PRODUCTO'])
+    marca = str(row['MARCA'])
+    cat = str(row['CATEGORIA'])
+    stk = int(row['STOCK']) # Ya está limpio por leer_productos
     p1 = float(row['CONTADO'])
     p6 = float(row['6 CUOTAS'])
     p12 = float(row['12 CUOTAS'])
@@ -252,7 +262,6 @@ def login_page():
             if u in creds and creds[u] == p:
                 st.session_state.logged_in = True
                 st.session_state.user_role = "admin" if u == "Rosana" else "vendedor"
-                # Lógica Walter
                 st.session_state.username = "Walter" if u == "vendedor" else "Rosana Da Silva"
                 st.rerun()
             else:
@@ -266,7 +275,6 @@ def panel_vendedor():
     
     df = leer_productos()
     
-    # BÚSQUEDA INTELIGENTE REACTIVADA
     if q:
         mask = df.apply(lambda r: fuzzy_match(q, str(r['PRODUCTO'])) or fuzzy_match(q, str(r['MARCA'])), axis=1)
         df = df[mask]
@@ -296,7 +304,6 @@ def panel_admin():
         
         df = leer_productos()
         
-        # BÚSQUEDA INTELIGENTE REACTIVADA
         if q:
             mask = df.apply(lambda r: fuzzy_match(q, str(r['PRODUCTO'])) or fuzzy_match(q, str(r['MARCA'])), axis=1)
             df = df[mask]
@@ -311,6 +318,20 @@ def panel_admin():
         else:
             for idx, row in df.iterrows():
                 card_visual(row, idx, es_admin=True)
+
+        # === SECCIÓN DE MÉTRICAS RECUPERADA ===
+        st.markdown("---")
+        st.subheader("📊 RESUMEN DEL IMPERIO")
+        
+        if not df.empty:
+            total_plata = (df['STOCK'] * df['CONTADO']).sum()
+            items_bajos = df[df['STOCK'] <= 2].shape[0]
+            
+            col_m1, col_m2, col_m3 = st.columns(3)
+            col_m1.metric("📦 Valor en Depósito", f"₲ {formato_guaranies(total_plata)}")
+            col_m2.metric("⚠️ Stock Crítico", f"{items_bajos} productos", delta="-URGENTE" if items_bajos > 0 else "Todo OK", delta_color="inverse")
+            col_m3.metric("🔢 Total Items", f"{len(df)}")
+
     with tab2:
         st.dataframe(leer_ventas(), use_container_width=True)
 
@@ -334,4 +355,3 @@ else:
         panel_admin()
     else:
         panel_vendedor()
-
