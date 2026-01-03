@@ -1,7 +1,7 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta # <--- AQUI AGREGUÉ TIMEDELTA
 from difflib import SequenceMatcher
 import time
 import unicodedata
@@ -64,7 +64,10 @@ st.markdown("""
 # ========== LÓGICA & DATOS ==========
 
 def obtener_saludo():
-    hora = datetime.now().hour
+    # AJUSTE DE ZONA HORARIA (UTC -3 Horas)
+    hora_actual = datetime.now() - timedelta(hours=3)
+    hora = hora_actual.hour
+    
     if 5 <= hora < 12:
         return "☀️ Buenos días"
     elif 12 <= hora < 19:
@@ -129,8 +132,11 @@ def guardar_productos(df):
 def registrar_venta(vendedor, producto, cantidad, tipo_pago, monto_total):
     conn = get_connection()
     df = leer_ventas()
+    # Usamos la hora ajustada también para el registro
+    fecha_ajustada = (datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S')
+    
     nuevo = pd.DataFrame([{
-        'FECHA': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'FECHA': fecha_ajustada,
         'VENDEDOR': vendedor, 'PRODUCTO': producto,
         'CANTIDAD': cantidad, 'TIPO_PAGO': tipo_pago, 'MONTO_TOTAL': monto_total
     }])
@@ -324,38 +330,31 @@ def panel_admin():
             
             # --- FILTRO POR MES ---
             df_v['FECHA_DT'] = pd.to_datetime(df_v['FECHA'], errors='coerce')
-            df_v['MES_ANO'] = df_v['FECHA_DT'].dt.strftime('%Y-%m') # Formato Ordenable
+            df_v['MES_ANO'] = df_v['FECHA_DT'].dt.strftime('%Y-%m') 
             
-            # Crear lista de meses legible en español
             meses_disp = sorted(df_v['MES_ANO'].dropna().unique().tolist(), reverse=True)
             meses_map = {m: datetime.strptime(m, '%Y-%m').strftime('%B %Y').capitalize() for m in meses_disp}
             opciones_filtro = ["HISTÓRICO GLOBAL"] + [meses_map[m] for m in meses_disp]
             
             filtro_mes = st.selectbox("📅 Filtrar por Periodo", opciones_filtro)
             
-            # Aplicar Filtro
             df_ranking = df_v.copy()
             if filtro_mes != "HISTÓRICO GLOBAL":
-                # Invertir el map para buscar el key original YYYY-MM
                 mes_seleccionado_key = [k for k, v in meses_map.items() if v == filtro_mes][0]
                 df_ranking = df_ranking[df_ranking['MES_ANO'] == mes_seleccionado_key]
 
-            # --- CÁLCULO DE RANKING ---
             df_ranking['MONTO_TOTAL'] = pd.to_numeric(df_ranking['MONTO_TOTAL'], errors='coerce').fillna(0)
             ranking = df_ranking.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index().sort_values(by='MONTO_TOTAL', ascending=False)
             
-            # Asignar Medallas
             medals = ['🥇', '🥈', '🥉']
             ranking['POS'] = range(1, len(ranking) + 1)
             ranking['MEDALLA'] = ranking['POS'].apply(lambda x: medals[x-1] if x <= 3 else str(x))
             
-            # Formato Visual
             ranking_display = pd.DataFrame()
             ranking_display['#'] = ranking['MEDALLA']
             ranking_display['VENDEDOR'] = ranking['VENDEDOR']
-            ranking_display['TOTAL VENDIDO'] = ranking['MONTO_TOTAL'] # Mantener numérico para barra
+            ranking_display['TOTAL VENDIDO'] = ranking['MONTO_TOTAL']
             
-            # TABLA ESTILIZADA (Sin gráfico feo)
             st.dataframe(
                 ranking_display,
                 use_container_width=True,
@@ -414,7 +413,6 @@ else:
         try: st.image(LOGO_PATH, use_container_width=True)
         except: pass
         st.divider()
-        # Saludo también en Sidebar
         saludo_sidebar = obtener_saludo()
         st.markdown(f"{saludo_sidebar},<br>**{st.session_state.username}**", unsafe_allow_html=True)
         st.caption(f"Rol: {st.session_state.user_role.upper()}")
