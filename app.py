@@ -103,19 +103,16 @@ def leer_productos():
     try: 
         df = conn.read(worksheet="PRODUCTOS")
         
-        # === CORRECCIÓN DE ERRORES AQUÍ ===
-        # 1. Eliminamos filas que no tengan nombre de producto (Filas vacías del Excel)
+        # === LIMPIEZA DE DATOS ===
         df = df.dropna(subset=['PRODUCTO'])
         df = df[df['PRODUCTO'].str.strip() != ''] 
         
-        # 2. Limpieza de números
         cols_num = ['STOCK', 'CONTADO', '6 CUOTAS', '12 CUOTAS']
         for col in cols_num:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # 3. Generamos ID ÚNICO usando el índice para evitar duplicados
-        # Esto soluciona el error "DuplicateElementKey"
+        # ID ÚNICO (Hash + Index) para evitar duplicados en botones
         df['ID_REF'] = [hashlib.md5(f"{r.PRODUCTO}_{r.MARCA}_{i}".encode()).hexdigest()[:10] for i, r in df.iterrows()]
         
         return df
@@ -180,7 +177,6 @@ def render_pos_interface(usuario):
             df_filtro = df
 
         if not df_filtro.empty:
-            # Iteramos con índice para asegurar keys únicas
             for i, row in df_filtro.iterrows():
                 id_prod = row['ID_REF']
                 stock = int(row['STOCK'])
@@ -202,7 +198,6 @@ def render_pos_interface(usuario):
                 
                 # Botón Acción
                 if stock > 0:
-                    # Key única real garantizada
                     if st.button("➕ AGREGAR", key=f"btn_{id_prod}"):
                         st.session_state.pos_cart = row.to_dict()
                         st.rerun() 
@@ -265,7 +260,6 @@ def render_pos_interface(usuario):
 def panel_admin():
     st.title("⚙️ Panel de Control")
     
-    # Cola de guardado
     if 'mob_q' in st.session_state and st.session_state.mob_q:
         st.warning(f"⚠️ {len(st.session_state.mob_q)} cambios sin guardar")
         if st.button("💾 GUARDAR CAMBIOS AHORA"):
@@ -277,32 +271,60 @@ def panel_admin():
             st.session_state.mob_q = {}
             st.success("Guardado"); st.rerun()
 
-    tab1, tab2, tab3 = st.tabs(["🛒 CAJA (POS)", "📦 GESTIÓN INVENTARIO", "📊 REPORTES"])
+    tab1, tab2, tab3 = st.tabs(["🛒 CAJA (POS)", "📦 GESTIÓN INVENTARIO", "📊 REPORTES & RANKING"])
     
     with tab1:
         render_pos_interface(st.session_state.username)
         
     with tab2:
         df = leer_productos()
-        # Ocultamos la columna ID_REF para que no moleste visualmente
         columnas_visibles = [c for c in df.columns if c != 'ID_REF']
         edited = st.data_editor(df[columnas_visibles], num_rows="dynamic", use_container_width=True, height=500)
         
         if st.button("💾 ACTUALIZAR INVENTARIO"):
-            # Al guardar, hay que tener cuidado. 
-            # Lo más seguro es recargar master y actualizar índices coincidentes
             guardar_productos(edited)
             st.success("Inventario Actualizado")
+        
+        # === MÉTRICAS RECUPERADAS (AQUÍ ESTÁN) ===
+        st.markdown("---")
+        st.subheader("📉 Estado del Inventario")
+        if not df.empty:
+            total_plata = (df['STOCK'] * df['CONTADO']).sum()
+            items_bajos = df[df['STOCK'] <= 2].shape[0]
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("💰 Valor en Mercadería", f"₲ {formato_guaranies(total_plata)}")
+            m2.metric("⚠️ Stock Crítico", f"{items_bajos} productos", delta_color="inverse")
+            m3.metric("📦 Total Items", f"{len(df)}")
 
     with tab3:
         df_v = leer_ventas()
         if not df_v.empty:
+            # === RANKING RECUPERADO (AQUÍ ESTÁ) ===
+            st.subheader("🏆 Top Vendedores")
+            
             df_v['MONTO_TOTAL'] = pd.to_numeric(df_v['MONTO_TOTAL'], errors='coerce').fillna(0)
-            total_v = df_v['MONTO_TOTAL'].sum()
-            st.metric("Total Vendido Histórico", f"₲ {formato_guaranies(total_v)}")
+            
+            # Agrupar por vendedor
+            ranking = df_v.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index()
+            ranking = ranking.sort_values(by='MONTO_TOTAL', ascending=False)
+            
+            # Gráfico y Tabla
+            c_rank1, c_rank2 = st.columns([1, 2])
+            
+            # Tabla formateada
+            ranking_display = ranking.copy()
+            ranking_display['TOTAL'] = ranking_display['MONTO_TOTAL'].apply(lambda x: f"₲ {formato_guaranies(x)}")
+            c_rank1.dataframe(ranking_display[['VENDEDOR', 'TOTAL']], hide_index=True, use_container_width=True)
+            
+            # Gráfico de barras
+            c_rank2.bar_chart(ranking, x='VENDEDOR', y='MONTO_TOTAL', color="#2E7D32")
+            
+            st.divider()
+            st.subheader("📝 Historial Detallado")
             st.dataframe(df_v, use_container_width=True)
         else:
-            st.info("Sin datos.")
+            st.info("No hay ventas registradas aún.")
 
 # ========== LOGIN ==========
 
@@ -342,12 +364,10 @@ if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     login_page()
 else:
-    # SIDEBAR: Aquí mostramos quién eres
     with st.sidebar:
         try: st.image(LOGO_PATH, use_container_width=True)
         except: pass
         
-        # INFO DEL USUARIO
         st.divider()
         st.markdown(f"👤 **{st.session_state.username}**")
         st.markdown(f"🔑 Rol: **{st.session_state.user_role.upper()}**")
