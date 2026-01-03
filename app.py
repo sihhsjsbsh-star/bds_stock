@@ -169,4 +169,190 @@ def popup_venta(item, usuario):
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("<br>", unsafe_allow_html=
+    # AQUÍ ESTABA EL ERROR: Asegúrate de copiar esto bien
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    col_ok, col_no = st.columns(2)
+    if col_ok.button("✅ CONFIRMAR", type="primary", use_container_width=True):
+        if actualizar_stock_pos(item['ID_REF'], cant):
+            registrar_venta(usuario, item['PRODUCTO'], cant, pago, total)
+            st.toast("¡Venta registrada con éxito!", icon="🎉")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error("¡Stock insuficiente!")
+            
+    if col_no.button("Cerrar", use_container_width=True):
+        st.rerun()
+
+# ========== INTERFAZ POS ==========
+
+def render_pos_interface(usuario):
+    # Carga de datos
+    df = leer_productos()
+    
+    # --- FILTRO POR CATEGORÍA ---
+    c_cat, c_search = st.columns([1, 2])
+    
+    with c_cat:
+        # Obtenemos categorías únicas y ordenadas
+        try:
+            categorias = sorted(df['CATEGORIA'].unique().tolist())
+        except:
+            categorias = ["GENERAL"]
+            
+        categorias.insert(0, "TODAS")
+        cat_seleccionada = st.selectbox("📂 Categoría", options=categorias)
+    
+    with c_search:
+        busqueda = st.text_input("🔎 Buscar producto...", placeholder="Nombre, marca...")
+
+    # --- LÓGICA DE FILTRADO ---
+    df_filtro = df.copy()
+    
+    # 1. Filtro Categoría
+    if cat_seleccionada != "TODAS":
+        df_filtro = df_filtro[df_filtro['CATEGORIA'] == cat_seleccionada]
+    
+    # 2. Filtro Texto
+    if busqueda:
+        mask = df_filtro.apply(lambda r: fuzzy_match(busqueda, str(r['PRODUCTO'])) or fuzzy_match(busqueda, str(r['MARCA'])), axis=1)
+        df_filtro = df_filtro[mask]
+
+    st.divider()
+
+    # --- RENDERIZADO DE LISTA ---
+    if not df_filtro.empty:
+        for i, row in df_filtro.iterrows():
+            id_unico = f"{row['ID_REF']}_{i}" 
+            stock = int(row['STOCK'])
+            bg_stock = "stock-low" if stock <= 2 else ""
+            
+            st.markdown(f"""
+            <div class="product-card-mini">
+                <div style="flex:3;">
+                    <div class="mini-title">{row['PRODUCTO']}</div>
+                    <div style="font-size:11px; color:#6B7280; text-transform:uppercase; font-weight:bold;">
+                        {row['CATEGORIA']} • {row['MARCA']}
+                    </div>
+                </div>
+                <div style="flex:1; text-align:right;">
+                    <div class="mini-price">₲ {formato_guaranies(row['CONTADO'])}</div>
+                    <span class="mini-stock {bg_stock}">Stock: {stock}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if stock > 0:
+                if st.button("🛒 VENDER", key=f"btn_{id_unico}"):
+                    popup_venta(row, usuario)
+            else:
+                st.button("🚫 AGOTADO", disabled=True, key=f"dis_{id_unico}")
+    else:
+        st.info("No se encontraron productos con esos filtros.")
+
+# ========== PANEL ADMIN ==========
+
+def panel_admin():
+    st.title("⚙️ Panel de Control")
+    
+    # Métricas
+    df = leer_productos()
+    if not df.empty:
+        total_plata = (df['STOCK'] * df['CONTADO']).sum()
+        items_bajos = df[df['STOCK'] <= 2].shape[0]
+        m1, m2, m3 = st.columns(3)
+        m1.metric("💰 Valor Inventario", f"₲ {formato_guaranies(total_plata)}")
+        m2.metric("⚠️ Stock Crítico", f"{items_bajos} productos", delta="- RIESGO" if items_bajos > 0 else "OK", delta_color="inverse")
+        m3.metric("📦 Total Items", f"{len(df)}")
+    
+    if 'mob_q' in st.session_state and st.session_state.mob_q:
+        st.warning(f"⚠️ {len(st.session_state.mob_q)} cambios sin guardar")
+        if st.button("💾 GUARDAR CAMBIOS AHORA"):
+            for i, data in st.session_state.mob_q.items():
+                if i in df.index:
+                    for k,v in data.items(): df.at[i,k]=v
+            guardar_productos(df)
+            st.session_state.mob_q = {}
+            st.success("Guardado"); st.rerun()
+
+    tab1, tab2, tab3 = st.tabs(["🛒 CAJA (POS)", "📦 GESTIÓN INVENTARIO", "📊 REPORTES"])
+    
+    with tab1:
+        render_pos_interface(st.session_state.username)
+        
+    with tab2:
+        columnas_visibles = [c for c in df.columns if c != 'ID_REF']
+        edited = st.data_editor(df[columnas_visibles], num_rows="dynamic", use_container_width=True, height=500)
+        if st.button("💾 ACTUALIZAR INVENTARIO"):
+            guardar_productos(edited)
+            st.success("Inventario Actualizado")
+
+    with tab3:
+        df_v = leer_ventas()
+        if not df_v.empty:
+            st.subheader("🏆 Ranking Vendedores")
+            df_v['MONTO_TOTAL'] = pd.to_numeric(df_v['MONTO_TOTAL'], errors='coerce').fillna(0)
+            ranking = df_v.groupby('VENDEDOR')['MONTO_TOTAL'].sum().reset_index().sort_values(by='MONTO_TOTAL', ascending=False)
+            
+            c_rank1, c_rank2 = st.columns([1, 2])
+            ranking_display = ranking.copy()
+            ranking_display['TOTAL'] = ranking_display['MONTO_TOTAL'].apply(lambda x: f"₲ {formato_guaranies(x)}")
+            c_rank1.dataframe(ranking_display[['VENDEDOR', 'TOTAL']], hide_index=True, use_container_width=True)
+            c_rank2.bar_chart(ranking, x='VENDEDOR', y='MONTO_TOTAL', color="#2E7D32")
+            
+            st.divider()
+            st.subheader("📝 Historial")
+            st.dataframe(df_v, use_container_width=True)
+        else: st.info("No hay ventas registradas.")
+
+# ========== LOGIN ==========
+
+def login_page():
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        try: st.image(LOGO_PATH, width=120) 
+        except: st.title("🔴 BDS")
+        st.markdown("### Acceso al Sistema")
+        u = st.text_input("Usuario")
+        p = st.text_input("Contraseña", type="password")
+        if st.button("INGRESAR", use_container_width=True):
+            creds = {"Rosana":"bdse1975", "vendedor":"ventas123", "Yuliany":"yuli2026", "Externo":"ext123"}
+            users = {
+                "Rosana": {"role":"admin", "name":"Rosana Da Silva"},
+                "vendedor": {"role":"vendedor", "name":"Walter"},
+                "Yuliany": {"role":"vendedor", "name":"Yuliany"},
+                "Externo": {"role":"vendedor", "name":"Externo"}
+            }
+            if u in creds and creds[u] == p:
+                st.session_state.logged_in = True
+                st.session_state.user_role = users[u]["role"]
+                st.session_state.username = users[u]["name"]
+                st.rerun()
+            else: st.error("Acceso Denegado")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ========== MAIN ==========
+
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    login_page()
+else:
+    with st.sidebar:
+        try: st.image(LOGO_PATH, use_container_width=True)
+        except: pass
+        st.divider()
+        st.markdown(f"👤 **{st.session_state.username}**")
+        st.markdown(f"🔑 Rol: **{st.session_state.user_role.upper()}**")
+        st.divider()
+        if st.button("Cerrar Sesión"):
+            st.session_state.clear(); st.rerun()
+
+    if st.session_state.user_role == "admin":
+        panel_admin()
+    else:
+        st.title(f"Punto de Venta")
+        render_pos_interface(st.session_state.username)
